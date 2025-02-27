@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "526939468596",
+    "project_id": "ecocharge-d39d2",
+    "storage_bucket": "ecocharge-d39d2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:526939468596:android:e6b10af590cd7e15cdab61",
+        "android_client_info": {
+          "package_name": "com.example.ecocharge"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "526939468596-73ckttgssu7bl4mlvue8uaf2l07p1frp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.ecocharge",
+            "certificate_hash": "50d00029948f73e274ae0091b8d644eaacde86fb"
+          }
+        },
+        {
+          "client_id": "526939468596-aovc2q6kj7defgh191bp4168v387g7hm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8A7G6aDib_9mAdoRE_rKCfCMRocD65co"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "526939468596-aovc2q6kj7defgh191bp4168v387g7hm.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
