@@ -5,6 +5,7 @@ import 'providers/auth_provider.dart';
 import 'screens/signup_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/arrival_screen.dart';
+import 'screens/map_screen.dart'; // ✅ Import Map Screen
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,9 +22,12 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Flutter Auth',
+        title: 'EcoCharge',
         theme: ThemeData(primarySwatch: Colors.blue),
         home: ArrivalScreen(), // Start at ArrivalScreen first
+        routes: {
+          '/map': (context) => MapScreen(), // ✅ Route to Map Screen
+        },
       ),
     );
   }
@@ -41,7 +45,7 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
     Future.delayed(Duration(seconds: 3), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => AuthWrapper()),
+        MaterialPageRoute(builder: (context) => AuthWrapper()), // ✅ Navigate to AuthWrapper
       );
     });
   }
@@ -49,11 +53,26 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:Colors.green,
+      backgroundColor: Colors.green.shade700,
       body: Center(
-        child: Text(
-          "Eco Charge",
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.electric_car,
+              size: 100,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              "EcoCharge",
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -67,7 +86,7 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
         if (auth.user != null) {
-          return HomeScreen(); // If user is logged in, go to HomeScreen
+          return MapScreen(); // ✅ Redirect to MapScreen after login
         } else {
           return SignupScreen(); // Otherwise, go to SignupScreen
         }

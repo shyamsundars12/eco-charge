@@ -6,6 +6,9 @@
         android:label="ecocharge"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyDIREeT6v67_f7FcJ5WhdT82Lvmwru0FM8"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

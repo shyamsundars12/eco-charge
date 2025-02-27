@@ -4,8 +4,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  User? _user;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(); // ✅ Single instance
 
+  User? _user;
   User? get user => _user;
 
   AuthProvider() {
@@ -15,40 +16,44 @@ class AuthProvider with ChangeNotifier {
   void _initAuthListener() {
     _auth.authStateChanges().listen((User? user) {
       _user = user;
-      notifyListeners(); // Notify UI when user changes
+      notifyListeners();
     });
   }
 
-  // ✅ Email & Password Signup
+  // ✅ Sign Up with Email
   Future<String?> signUpWithEmail(String email, String password) async {
     try {
       UserCredential credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      _user = credential.user; // Update local user
+      _user = credential.user;
       notifyListeners();
-      return null; // Success
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return e.message ?? "Signup failed. Try again.";
     } catch (e) {
-      return e.toString(); // Return error message
+      return "An unexpected error occurred: ${e.toString()}";
     }
   }
 
-  // ✅ Email & Password Sign-in
+  // ✅ Sign In with Email
   Future<String?> signInWithEmail(String email, String password) async {
     try {
       UserCredential credential = await _auth.signInWithEmailAndPassword(email: email, password: password);
-      _user = credential.user; // Update local user
+      _user = credential.user;
       notifyListeners();
-      return null; // Success
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return e.message ?? "Sign-in failed. Try again.";
     } catch (e) {
-      return e.toString(); // Return error message
+      return "An unexpected error occurred: ${e.toString()}";
     }
   }
 
-  // ✅ Google Sign-In with Forced Account Selection
+  // ✅ Sign In with Google (Improved)
   Future<String?> signInWithGoogle() async {
     try {
-      await GoogleSignIn().signOut(); // Ensures account selection every time
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return "Google Sign-In canceled"; // Handle cancellation
+      await _googleSignIn.signOut(); // ✅ Ensures fresh account selection
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) return "Google Sign-In canceled.";
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -57,19 +62,20 @@ class AuthProvider with ChangeNotifier {
       );
 
       UserCredential userCredential = await _auth.signInWithCredential(credential);
-      _user = userCredential.user; // Update local user
+      _user = userCredential.user;
       notifyListeners();
       return null; // Success
+    } on FirebaseAuthException catch (e) {
+      return e.message ?? "Google Sign-In failed. Try again.";
     } catch (e) {
-      return e.toString(); // Return error message
+      return "An unexpected error occurred: ${e.toString()}";
     }
   }
 
   // ✅ Sign Out
   Future<void> signOut() async {
     await _auth.signOut();
-    await GoogleSignIn().disconnect();
-    await GoogleSignIn().signOut();
+    await _googleSignIn.signOut();
     _user = null;
     notifyListeners();
   }
