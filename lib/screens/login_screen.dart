@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    String? error = await authProvider.signInWithGoogle(); // ❌ Removed context argument
+    String? error = await authProvider.signInWithGoogle(); //
 
     if (error == null) {
       Navigator.pushReplacement(

@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/signup_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/arrival_screen.dart';
-import 'screens/map_screen.dart'; // ✅ Import Map Screen
+import 'screens/map_screen.dart';
+import 'screens/vehicle_details_screen.dart';
+// import 'screens/payment_screen.dart';
+import 'screens/my_bookings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // Initialize Firebase
+  await Firebase.initializeApp();
   runApp(MyApp());
 }
 
@@ -18,15 +19,20 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => AuthProvider()), // Provide AuthProvider globally
+        ChangeNotifierProvider(create: (context) => AuthProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'EcoCharge',
         theme: ThemeData(primarySwatch: Colors.blue),
-        home: ArrivalScreen(), // Start at ArrivalScreen first
+        initialRoute: '/',
         routes: {
-          '/map': (context) => MapScreen(), // ✅ Route to Map Screen
+          '/': (context) => ArrivalScreen(),
+          '/auth': (context) => AuthWrapper(),
+          '/map': (context) => MapScreen(),
+          '/vehicleDetails': (context) => VehicleDetailsScreen(stationId: "123"),
+          // '/payment': (context) => PaymentScreen(vehicleNumber: "", vehicleModel: "", chargingSlot: ""),
+          '/myBookings': (context) => MyBookingsScreen(),
         },
       ),
     );
@@ -35,7 +41,7 @@ class MyApp extends StatelessWidget {
 
 class ArrivalScreen extends StatefulWidget {
   @override
-  _ArrivalScreenState createState()  => _ArrivalScreenState();
+  _ArrivalScreenState createState() => _ArrivalScreenState();
 }
 
 class _ArrivalScreenState extends State<ArrivalScreen> {
@@ -43,10 +49,7 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
   void initState() {
     super.initState();
     Future.delayed(Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => AuthWrapper()), // ✅ Navigate to AuthWrapper
-      );
+      Navigator.pushReplacementNamed(context, '/auth');
     });
   }
 
@@ -58,19 +61,11 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.electric_car,
-              size: 100,
-              color: Colors.white,
-            ),
+            Icon(Icons.electric_car, size: 100, color: Colors.white),
             const SizedBox(height: 20),
             Text(
               "EcoCharge",
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ],
         ),
@@ -79,17 +74,12 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
   }
 }
 
-// ✅ AuthWrapper: Checks if user is logged in or not
 class AuthWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
-        if (auth.user != null) {
-          return MapScreen(); // ✅ Redirect to MapScreen after login
-        } else {
-          return SignupScreen(); // Otherwise, go to SignupScreen
-        }
+        return auth.user != null ? MapScreen() : SignupScreen();
       },
     );
   }
