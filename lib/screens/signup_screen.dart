@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
@@ -12,6 +13,8 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmpasswordController = TextEditingController();
+
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
@@ -43,18 +46,25 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _isLoading = true);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    String? error = await authProvider.signInWithGoogle(); // ❌ Removed context argument
+    try {
+      String? error = await authProvider.signInWithGoogle();
 
-    if (error == null) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => MapScreen()), // ✅ Navigate to MapScreen
-      );
-    } else {
+      if (error == null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => MapScreen()), // ✅ Navigate to MapScreen
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error, style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error, style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+        SnackBar(content: Text("Google Sign-In Failed: $e", style: TextStyle(color: Colors.white)), backgroundColor: Colors.red),
       );
     }
+
     setState(() => _isLoading = false);
   }
 
@@ -70,10 +80,16 @@ class _SignupScreenState extends State<SignupScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Image.asset('assets/images/welcome_image.jpg', height: 150),
                   SizedBox(height: 20),
+                  SvgPicture.asset(
+                    'assets/images/city_driver.svg',
+                    height: 150,
+                    width: 150,
+                    placeholderBuilder: (context) => CircularProgressIndicator(),
+                  ),
+                  SizedBox(height: 30),
                   Text('Create Account', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
+                  SizedBox(height: 20),
                   Text(
                     'Create an account to explore nearby EV charging stations!',
                     textAlign: TextAlign.center,
@@ -81,11 +97,13 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   SizedBox(height: 20),
 
+                  // Email Field
                   TextFormField(
                     controller: _emailController,
                     decoration: InputDecoration(
                       labelText: "Email",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: Icon(Icons.email),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
@@ -94,13 +112,15 @@ class _SignupScreenState extends State<SignupScreen> {
                       return null;
                     },
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 20),
 
+                  // Password Field
                   TextFormField(
                     controller: _passwordController,
                     decoration: InputDecoration(
                       labelText: "Password",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: Icon(Icons.lock),
                     ),
                     obscureText: true,
                     validator: (value) {
@@ -109,9 +129,27 @@ class _SignupScreenState extends State<SignupScreen> {
                       return null;
                     },
                   ),
+                  SizedBox(height: 20),
+
+                  // Confirm Password Field
+                  TextFormField(
+                    controller: _confirmpasswordController, // ✅ Fixed controller
+                    decoration: InputDecoration(
+                      labelText: "Confirm Password",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                    obscureText: true,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return "Confirm Password cannot be empty";
+                      if (value != _passwordController.text) return "Passwords do not match"; // ✅ Password match validation
+                      return null;
+                    },
+                  ),
 
                   SizedBox(height: 20),
 
+                  // Sign Up Button
                   _isLoading
                       ? CircularProgressIndicator()
                       : SizedBox(
@@ -119,16 +157,17 @@ class _SignupScreenState extends State<SignupScreen> {
                     child: ElevatedButton(
                       onPressed: () => _signUp(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: Color(0xFF0033AA),
                         padding: EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: Text("Sign up", style: TextStyle(fontSize: 18)),
+                      child: Text("Sign up", style: TextStyle(fontSize: 18, color: Colors.white)),
                     ),
                   ),
 
-                  SizedBox(height: 10),
+                  SizedBox(height: 20),
 
+                  // Navigate to Login
                   Text("Already have an account?", style: TextStyle(color: Colors.grey[600])),
                   TextButton(
                     onPressed: () => Navigator.push(
@@ -140,12 +179,13 @@ class _SignupScreenState extends State<SignupScreen> {
                   Text("Or continue with"),
                   SizedBox(height: 10),
 
+                  // Social Login Buttons
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
                         onPressed: () => _signInWithGoogle(context),
-                        icon: Icon(Icons.g_mobiledata, size: 32, color: Colors.red), // ✅ Uses FontAwesome Google icon
+                        icon: Icon(Icons.g_mobiledata, size: 32, color: Colors.red), // ✅ Fixed Google Sign-In
                       ),
                       IconButton(
                         onPressed: () {},

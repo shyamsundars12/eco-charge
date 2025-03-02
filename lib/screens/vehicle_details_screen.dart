@@ -35,7 +35,8 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Enter Vehicle Details"),
-        backgroundColor: Colors.green,
+        backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: EdgeInsets.all(16.0),
@@ -78,16 +79,19 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
               ElevatedButton(
                 onPressed: _proceedToPayment,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
+                  backgroundColor: Color(0xFF0033AA),
+                  foregroundColor: Colors.white,
                   padding: EdgeInsets.symmetric(vertical: 12),
-                  textStyle: TextStyle(fontSize: 18),
+                  textStyle: TextStyle(fontSize: 18,),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.payment),
+                    Icon(Icons.payment, color: Colors.white),
+
                     SizedBox(width: 8),
                     Text("Proceed to Payment"),
+
                   ],
                 ),
               ),

@@ -40,6 +40,7 @@ dependencies:
   location: ^8.0.0
   geocoding: ^3.0.0
   flutter_google_maps_webservices: ^1.1.1
+  flutter_svg: ^2.0.9
 
 
 
@@ -52,13 +53,14 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/charging_station.png"
+  background_color: "#ffffff"  # Use hex value for white
 
+
+flutter_lints: ^5.0.0
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -74,6 +76,12 @@ flutter:
     - assets/images/apple.png
     - assets/images/facebook.png
     - assets/images/google.png
+    - assets/images/hybrid_car.svg
+    - assets/images/city_driver.svg
+    - assets/images/login_img.svg
+    - assets/icons/charging_logo.png
+
+
 
   # To add images to your application, add an images section, like this:
   # images:
@@ -105,8 +113,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-flutter_icons:
-  android: true
-  ios: true
-  image_path: "assets/app_icon.png"
-  adaptive_icon_background: "#ffffff"

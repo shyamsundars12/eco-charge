@@ -23,7 +23,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("My Bookings"),
-        backgroundColor: Colors.green,
+        backgroundColor: Color(0xFF0033AA),
+        leading: IconButton(  // ✅ Back button
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _fetchBookings(),
@@ -45,22 +51,23 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                 ),
                 elevation: 3,
                 margin: EdgeInsets.symmetric(vertical: 8),
-                child: ListTile(
-                  contentPadding: EdgeInsets.all(12),
-                  title: Text(
-                    data['stationName'],
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  subtitle: Column(
+                child: Container(
+                  height: 150, // ✅ Increased height
+                  padding: EdgeInsets.all(16), // ✅ Added padding
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Vehicle: ${data['vehicleModel']}"),
-                      Text("Charging Capacity: ${data['chargingCapacity']} kWh"),
-                      Text("Date: ${data['date']}"),
-                      Text("Status: ${data['status']}"),
+                      Text(
+                        data['stationName'],
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                      ),
+                      SizedBox(height: 8),
+                      Text("Vehicle: ${data['vehicleModel']}", style: TextStyle(fontSize: 16)),
+                      Text("Charging Capacity: ${data['chargingCapacity']} kWh", style: TextStyle(fontSize: 16)),
+                      Text("Date: ${data['date']}", style: TextStyle(fontSize: 16)),
+                      Text("Status: ${data['status']}", style: TextStyle(fontSize: 16)),
                     ],
                   ),
-                  trailing: Icon(Icons.electric_car, color: Colors.green),
                 ),
               );
             }).toList(),

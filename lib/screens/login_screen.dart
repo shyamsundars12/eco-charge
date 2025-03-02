@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart' show SvgPicture;
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'signup_screen.dart';
@@ -66,8 +67,19 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  SizedBox(height: 20),
+                  SizedBox(
+                    height: 150,
+                    child: SvgPicture.asset(
+                      'assets/images/login_img.svg',
+                      height: 150,
+                      width: 150,
+                      placeholderBuilder: (context) => CircularProgressIndicator(), // Fallback in case SVG fails
+                    ),
+                  ),
+                  SizedBox(height: 20),
                   Text("Login Here", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
+                  SizedBox(height: 10),
                   Text("Welcome back! You've been missed!", style: TextStyle(color: Colors.grey)),
                   SizedBox(height: 20),
 
@@ -76,6 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: InputDecoration(
                       labelText: "Email",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: Icon(Icons.email),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
@@ -84,13 +97,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  SizedBox(height: 10),
+                  SizedBox(height: 20),
 
                   TextFormField(
                     controller: _passwordController,
                     decoration: InputDecoration(
                       labelText: "Password",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: Icon(Icons.lock),
                     ),
                     obscureText: true,
                     validator: (value) {
@@ -100,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
 
-                  SizedBox(height: 10),
+                  SizedBox(height: 20),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
@@ -110,18 +124,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   SizedBox(height: 20),
 
-                  _isLoading
-                      ? CircularProgressIndicator()
-                      : ElevatedButton(
-                    onPressed: () => _login(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 40),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: Text("Sign in", style: TextStyle(fontSize: 16)),
+              _isLoading
+                  ? CircularProgressIndicator()
+                  : SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _login(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF0033AA),
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-
+                    child: Text("Sign in", style: TextStyle(fontSize: 18,color: Colors.white)),
+                  ),
+              ),
                   SizedBox(height: 20),
 
                   Text("Don't have an account?"),

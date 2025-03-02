@@ -1,0 +1,2 @@
+C:/Users/Hp/AndroidStudioProjects/ecocharge/android/app/.cxx/RelWithDebInfo/2y0351q6/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/Hp/AndroidStudioProjects/ecocharge/android/app/.cxx/RelWithDebInfo/2y0351q6/arm64-v8a/CMakeFiles/rebuild_cache.dir

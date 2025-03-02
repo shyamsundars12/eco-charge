@@ -1,3 +1,4 @@
+import 'package:ecocharge/screens/signup_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -14,7 +15,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   GoogleMapController? mapController;
-  LatLng _initialPosition = LatLng(37.7749, -122.4194);
+  LatLng _initialPosition = LatLng(11.0243, 77.0028);
   Set<Marker> _markers = {};
   TextEditingController _searchController = TextEditingController();
   int _selectedIndex = 0;
@@ -52,7 +53,7 @@ class _MapScreenState extends State<MapScreen> {
         return Marker(
           markerId: MarkerId(doc.id),
           position: LatLng(doc['latitude'], doc['longitude']),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           infoWindow: InfoWindow(
             title: doc['name'],
             snippet: "\$${doc['price_per_kwh']}/kWh",
@@ -66,34 +67,71 @@ class _MapScreenState extends State<MapScreen> {
   void _showStationDetails(QueryDocumentSnapshot doc) {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.all(15),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(doc['name'], style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            Text("Price: \$${doc['price_per_kwh']}/kWh"),
-            Text("Availability: ${doc['availability'] ? 'Available' : 'Not Available'}"),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/vehicleDetails', arguments: doc.id);
-              },
-              child: Text("Book Now"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        height: 300, // Increased height of the bottom sheet
+        decoration: BoxDecoration(
+          color: Colors.white, // White background for a professional look
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(15),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Center the heading
+              Center(
+                child: Text(
+                  doc['name'],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: 40),
+              // Price text with left padding
+              Padding(
+                padding: EdgeInsets.only(left: 20),
+                child: Text(
+                  "Price: \$${doc['price_per_kwh']}/kWh",
+                  style: TextStyle(fontSize: 16, color: Colors.black),
+                ),
+              ),
+              SizedBox(height: 20),
+              // Availability text with left padding
+              Padding(
+                padding: EdgeInsets.only(left: 20),
+                child: Text(
+                  "Availability: ${doc['availability'] ? 'Available' : 'Not Available'}",
+                  style: TextStyle(fontSize: 16, color: Colors.black),
+                ),
+              ),
+              Spacer(), // Pushes the button to the bottom
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, '/vehicleDetails', arguments: doc.id);
+                  },
+                  child: Text("Book Now"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF0033AA),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+
 
   Future<void> _searchLocation() async {
     String query = _searchController.text;
@@ -162,21 +200,39 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Find EV Stations"),
-        backgroundColor: Colors.green,
+        backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white), // Back arrow
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context); // ✅ Goes back if possible
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => ArrivalScreen()), // Redirect if no back screen
+              );
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.logout, color: Colors.white),
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ArrivalScreen()));
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => SignupScreen()),
+              );
             },
           ),
         ],
       ),
+
       body: Column(
         children: [
           Padding(
-            padding: EdgeInsets.all(8.0),
+            padding: EdgeInsets.all(10.0),
             child: Row(
               children: [
                 Expanded(
@@ -207,6 +263,7 @@ class _MapScreenState extends State<MapScreen> {
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.white,
         currentIndex: _selectedIndex,
         onTap: _onTabTapped,
         selectedItemColor: Colors.blue,

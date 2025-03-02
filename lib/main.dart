@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart' show SvgPicture;
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/signup_screen.dart';
@@ -56,13 +57,19 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green.shade700,
+      backgroundColor: Color(0xFF0033AA),
+
+
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.electric_car, size: 100, color: Colors.white),
-            const SizedBox(height: 20),
+            SvgPicture.asset(
+              'assets/images/hybrid_car.svg',
+              height: 150,
+              width: 150,
+            ),
+            SizedBox(height: 10),
             Text(
               "EcoCharge",
               style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.white),
