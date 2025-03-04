@@ -70,7 +70,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 For any queries, contact:
 - **Developer**: Shyam Sundar S
 - **Developer**: Janani M
-- **Email**: ecochargefinder.com
+- **Email**: ecochargefinder@gmail.com
 
 ---
 **Eco Charge** - Making EV Charging More Accessible 🚀
