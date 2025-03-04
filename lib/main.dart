@@ -1,3 +1,4 @@
+import 'package:ecocharge/services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart' show SvgPicture;
@@ -6,12 +7,15 @@ import 'providers/auth_provider.dart';
 import 'screens/signup_screen.dart';
 import 'screens/map_screen.dart';
 import 'screens/vehicle_details_screen.dart';
-// import 'screens/payment_screen.dart';
 import 'screens/my_bookings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Initialize the notification service
+  await NotificationService().initNotifications();
+
   runApp(MyApp());
 }
 
@@ -32,7 +36,6 @@ class MyApp extends StatelessWidget {
           '/auth': (context) => AuthWrapper(),
           '/map': (context) => MapScreen(),
           '/vehicleDetails': (context) => VehicleDetailsScreen(stationId: "123"),
-          // '/payment': (context) => PaymentScreen(vehicleNumber: "", vehicleModel: "", chargingSlot: ""),
           '/myBookings': (context) => MyBookingsScreen(),
         },
       ),
@@ -49,6 +52,10 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
   @override
   void initState() {
     super.initState();
+
+    // Trigger a notification at an unspecified interval
+    NotificationService().showRandomNotification();
+
     Future.delayed(Duration(seconds: 3), () {
       Navigator.pushReplacementNamed(context, '/auth');
     });
@@ -58,8 +65,6 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Color(0xFF0033AA),
-
-
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

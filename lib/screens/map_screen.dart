@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geocoding/geocoding.dart';
 
 import '../main.dart';
+import '../services/notification_service.dart';
 
 class MapScreen extends StatefulWidget {
   @override
@@ -41,7 +42,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (mapController != null) {
       mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(CameraPosition(target: _initialPosition, zoom: 14)),
+        CameraUpdate.newCameraPosition(CameraPosition(target: _initialPosition, zoom: 20)),
       );
     }
   }
@@ -112,6 +113,8 @@ class _MapScreenState extends State<MapScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
+                    NotificationService().showBookingNotification("Peelamedu");
+                    print("Booking successful!");
                     Navigator.pop(context);
                     Navigator.pushNamed(context, '/vehicleDetails', arguments: doc.id);
                   },
