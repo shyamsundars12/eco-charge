@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart' show SvgPicture;
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import 'forgot_password.dart';
 import 'signup_screen.dart';
 import 'map_screen.dart';
 
@@ -118,9 +119,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () {},
-                      child: Text("Forgot your password?", style: TextStyle(color: Colors.blue)),
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ForgotPasswordPage()),
+                      ),
+                      child: Text(
+                        "Forgot your password?",
+                        style: TextStyle(color: Colors.blue),
+                      ),
                     ),
+
                   ),
                   SizedBox(height: 20),
 
