@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'arrival_screen.dart';
-
+import '../../main.dart';
 class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {

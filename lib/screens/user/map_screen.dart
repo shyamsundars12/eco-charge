@@ -1,13 +1,14 @@
-import 'package:ecocharge/screens/signup_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:ecocharge/screens/user/signup_screen.dart';
+import 'package:ecocharge/screens/user/slot_booking_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geocoding/geocoding.dart';
 
-import '../main.dart';
-import '../services/notification_service.dart';
+import '../../main.dart';
+import 'my_bookings_screen.dart';
 
 class MapScreen extends StatefulWidget {
   @override
@@ -42,7 +43,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (mapController != null) {
       mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(CameraPosition(target: _initialPosition, zoom: 20)),
+        CameraUpdate.newCameraPosition(CameraPosition(target: _initialPosition, zoom: 10)),
       );
     }
   }
@@ -58,23 +59,23 @@ class _MapScreenState extends State<MapScreen> {
           infoWindow: InfoWindow(
             title: doc['name'],
             snippet: "\$${doc['price_per_kwh']}/kWh",
-            onTap: () => _showStationDetails(doc),
+            onTap: () => _showStationDetails(doc.id, doc),
           ),
         );
       }).toSet();
     });
   }
 
-  void _showStationDetails(QueryDocumentSnapshot doc) {
+  void _showStationDetails(String stationId, QueryDocumentSnapshot doc) {
     showModalBottomSheet(
       context: context,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
-        height: 300, // Increased height of the bottom sheet
+        height: 300,
         decoration: BoxDecoration(
-          color: Colors.white, // White background for a professional look
+          color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Padding(
@@ -82,7 +83,6 @@ class _MapScreenState extends State<MapScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Center the heading
               Center(
                 child: Text(
                   doc['name'],
@@ -91,7 +91,6 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
               SizedBox(height: 40),
-              // Price text with left padding
               Padding(
                 padding: EdgeInsets.only(left: 20),
                 child: Text(
@@ -100,7 +99,6 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
               SizedBox(height: 20),
-              // Availability text with left padding
               Padding(
                 padding: EdgeInsets.only(left: 20),
                 child: Text(
@@ -108,15 +106,18 @@ class _MapScreenState extends State<MapScreen> {
                   style: TextStyle(fontSize: 16, color: Colors.black),
                 ),
               ),
-              Spacer(), // Pushes the button to the bottom
+              Spacer(),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    NotificationService().showBookingNotification("Peelamedu");
-                    print("Booking successful!");
-                    Navigator.pop(context);
-                    Navigator.pushNamed(context, '/vehicleDetails', arguments: doc.id);
+                    Navigator.pop(context); // Close bottom sheet
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SlotBookingScreen(stationId: stationId),
+                      ),
+                    );
                   },
                   child: Text("Book Now"),
                   style: ElevatedButton.styleFrom(
@@ -133,8 +134,6 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
   }
-
-
 
   Future<void> _searchLocation() async {
     String query = _searchController.text;
@@ -165,36 +164,15 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onTabTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  Widget _buildCurrentScreen() {
-    switch (_selectedIndex) {
-      case 0:
-        return Container(
-          padding: EdgeInsets.all(8.0),
-          height: MediaQuery.of(context).size.height * 0.75,
-          child: GoogleMap(
-            initialCameraPosition: CameraPosition(target: _initialPosition, zoom: 14),
-            onMapCreated: (GoogleMapController controller) {
-              setState(() {
-                mapController = controller;
-              });
-            },
-            myLocationEnabled: true,
-            markers: _markers,
-          ),
-        );
-      case 1:
-        return Center(child: Text("📅 My Bookings"));
-      case 2:
-        return Center(child: Text("📞 Contact Us"));
-      case 3:
-        return Center(child: Text("👤 Account"));
-      default:
-        return Center(child: Text("⚡ More Features Coming Soon!"));
+    if (index == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => MyBookingsScreen()),
+      );
+    } else {
+      setState(() {
+        _selectedIndex = index;
+      });
     }
   }
 
@@ -206,14 +184,14 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: Color(0xFF0033AA),
         foregroundColor: Colors.white,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white), // Back arrow
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {
             if (Navigator.canPop(context)) {
-              Navigator.pop(context); // ✅ Goes back if possible
+              Navigator.pop(context);
             } else {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => ArrivalScreen()), // Redirect if no back screen
+                MaterialPageRoute(builder: (context) => ArrivalScreen()),
               );
             }
           },
@@ -231,7 +209,6 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ],
       ),
-
       body: Column(
         children: [
           Padding(
@@ -245,12 +222,6 @@ class _MapScreenState extends State<MapScreen> {
                       hintText: "Search location...",
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                        icon: Icon(Icons.clear),
-                        onPressed: () => setState(() => _searchController.clear()),
-                      )
-                          : null,
                     ),
                   ),
                 ),
@@ -262,11 +233,21 @@ class _MapScreenState extends State<MapScreen> {
               ],
             ),
           ),
-          Expanded(child: _buildCurrentScreen()),
+          Expanded(
+            child: GoogleMap(
+              initialCameraPosition: CameraPosition(target: _initialPosition, zoom: 14),
+              onMapCreated: (GoogleMapController controller) {
+                setState(() {
+                  mapController = controller;
+                });
+              },
+              myLocationEnabled: true,
+              markers: _markers,
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
         currentIndex: _selectedIndex,
         onTap: _onTabTapped,
         selectedItemColor: Colors.blue,
