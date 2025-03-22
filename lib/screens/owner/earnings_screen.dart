@@ -33,10 +33,11 @@ class _EarningsScreenState extends State<EarningsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Earnings")),
+      appBar: AppBar(title: Text("Earnings"),backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,),
       body: Center(
         child: Text(
-          "Total Earnings: \$${totalEarnings.toStringAsFixed(2)}",
+          "Total Earnings: ₹${totalEarnings.toStringAsFixed(2)}",
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
       ),

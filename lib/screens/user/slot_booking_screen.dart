@@ -1,3 +1,4 @@
+import 'package:ecocharge/screens/user/vehicle_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -18,121 +19,165 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Book Slot - ${widget.stationId}")), // ✅ Displays Station ID
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text("Book Slot - ${widget.stationId}", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,
+      ),
       body: Column(
         children: [
-          SizedBox(height: 10),
+          SizedBox(height: 20), // Increased space above Date Selector
           buildDateSelector(),
-          SizedBox(height: 10),
-          Expanded(child: buildSlotGrid()), // ✅ Display slots dynamically
+          SizedBox(height: 50), // Increased space between Date Selector & Slots
+          Expanded(child: buildSlotGrid()),
+          if (selectedSlotTime.isNotEmpty) SizedBox(height: 20), // Space before Button
           if (selectedSlotTime.isNotEmpty) buildContinueButton(),
         ],
       ),
+
     );
   }
 
-  /// ✅ Date Selector (Next 7 Days)
+  /// ✅ Modernized Date Selector
   Widget buildDateSelector() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: List.generate(7, (index) {
+    return SizedBox(
+      height: 80,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: 7,
+        itemBuilder: (context, index) {
           DateTime date = DateTime.now().add(Duration(days: index));
+          bool isSelected = selectedDate.day == date.day;
+
           return GestureDetector(
             onTap: () => setState(() => selectedDate = date),
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 5),
-              padding: EdgeInsets.all(8),
+            child: AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              margin: EdgeInsets.symmetric(horizontal: 6),
+              padding: EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: selectedDate.day == date.day ? Colors.red : Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey),
+                color: isSelected ? Colors.white : Color(0xFF0033AA),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  if (isSelected)
+                    BoxShadow(color: Color(0xFF0033AA).withOpacity(0.3), blurRadius: 8, offset: Offset(0, 4))
+                ],
+                border: Border.all(color: isSelected ? Color(0xFF0033AA) : Colors.white),
               ),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(DateFormat('E').format(date)), // Mon, Tue, etc.
-                  Text("${date.day}", style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(DateFormat('E').format(date), style: TextStyle(color: isSelected ? Color(0xFF0033AA) : Colors.white)),
+                  Text("${date.day}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isSelected ? Color(0xFF0033AA) : Colors.white)),
                 ],
               ),
             ),
           );
-        }),
+        },
       ),
     );
   }
 
-  /// ✅ Fetch Slots from Firestore & Display in Grid
+  /// ✅ Fetch Slots & Display with Updated Colors
   Widget buildSlotGrid() {
     String formattedDate = DateFormat('yyyy-MM-dd').format(selectedDate);
-    print("Fetching slots for station: ${widget.stationId} on $formattedDate");
 
     return StreamBuilder<QuerySnapshot>(
       stream: _firestore
-          .collection('charging_slots') // ✅ Select Charging Slots Collection
-          .doc(widget.stationId) // ✅ Get only slots for this Station
-          .collection(formattedDate) // ✅ Get slots for selected Date
-          .where('status', isEqualTo: 'available') // ✅ Only fetch available slots
+          .collection('charging_slots')
+          .doc(widget.stationId)
+          .collection(formattedDate)
+          .where('status', isEqualTo: 'available')
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.hasError) return Center(child: Text("Error: ${snapshot.error}"));
-        if (snapshot.connectionState == ConnectionState.waiting) return Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) {
+          return Center(child: Text("Error: ${snapshot.error}", style: TextStyle(color: Colors.red)));
+        }
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: Color(0xFF0033AA)));
+        }
 
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return Center(child: Text("No available slots for this date."));
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 50),
+              child: Text(
+                "No available slots for this date.",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0033AA)),
+              ),
+            ),
+          );
         }
 
         var slots = snapshot.data!.docs;
 
-        return GridView.builder(
-          padding: EdgeInsets.all(10),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            childAspectRatio: 2.5,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-          ),
-          itemCount: slots.length,
-          itemBuilder: (context, index) {
-            var doc = slots[index];
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-            String slotTime = data['time'];
+        return Center(
+          child: GridView.builder(
+            padding: EdgeInsets.all(20),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+            ),
+            itemCount: slots.length,
+            itemBuilder: (context, index) {
+              var doc = slots[index];
+              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              String slotTime = data['time'];
+              bool isSelected = selectedSlotTime == slotTime;
 
-            return GestureDetector(
-              onTap: () => setState(() => selectedSlotTime = slotTime),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: (selectedSlotTime == slotTime ? Colors.red : Colors.green),
-                  borderRadius: BorderRadius.circular(10),
+              return GestureDetector(
+                onTap: () => setState(() => selectedSlotTime = slotTime),
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 300),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: isSelected ? Color(0xFF0033AA) : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Color(0xFF0033AA), width: 2),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 3))
+                    ],
+                  ),
+                  child: Text(
+                    slotTime,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Color(0xFF0033AA),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
                 ),
-                child: Text(
-                  slotTime,
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
   }
 
-  /// ✅ Book Slot Button
+  /// ✅ Improved "Book Slot" Button with Your Colors
   Widget buildContinueButton() {
     return Padding(
-      padding: EdgeInsets.all(10),
+      padding: EdgeInsets.all(15),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          minimumSize: Size(double.infinity, 50),
+          backgroundColor: Color(0xFF0033AA), // ✅ Blue Background
+          foregroundColor: Colors.white, // ✅ White Text
+          minimumSize: Size(double.infinity, 55),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shadowColor: Colors.white.withOpacity(0.4),
+          elevation: 6,
         ),
         onPressed: bookSlot,
-        child: Text("Book Slot", style: TextStyle(color: Colors.white)),
+        child: Text("Book Slot", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ),
     );
   }
 
-  /// ✅ Book Slot in Firestore
+  /// ✅ Book Slot with Themed Snackbar
   Future<void> bookSlot() async {
     if (selectedSlotTime.isEmpty) return;
 
@@ -144,11 +189,39 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
         .doc(selectedSlotTime);
 
     try {
-      await slotRef.update({'status': 'booked'}); // ✅ Update Firestore
+      await slotRef.update({'status': 'booked'});
       setState(() => selectedSlotTime = "");
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Slot booked successfully!")));
+
+      // Show SnackBar for Success
+      /*ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Slot booked successfully!", style: TextStyle(fontSize: 16, color: Colors.white)),
+          backgroundColor: Color(0xFF0033AA),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );*/
+
+      // Navigate to VehicleDetailsScreen after a slight delay
+      Future.delayed(Duration(milliseconds: 500), () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VehicleDetailsScreen(stationId: widget.stationId),
+          ),
+        );
+      });
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Failed to book slot: $error")));
+      // Show Error SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to book slot: $error", style: TextStyle(fontSize: 16, color: Colors.white)),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
     }
   }
+
 }

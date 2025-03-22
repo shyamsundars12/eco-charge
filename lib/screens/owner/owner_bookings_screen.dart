@@ -7,7 +7,8 @@ class OwnerBookingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Station Bookings")),
+      appBar: AppBar(title: Text("Station Bookings"),backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,),
       body: StreamBuilder(
         stream: FirebaseFirestore.instance
             .collection('bookings')

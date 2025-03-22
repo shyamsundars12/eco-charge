@@ -89,6 +89,8 @@ flutter:
     - assets/images/login_img.svg
     - assets/icons/charging_logo.png
     - assets/images/forgot_password.png
+    - assets/images/evowner.jpg
+    - assets/images/vehicle_details.jpg
 
 
 

@@ -31,7 +31,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Reports")),
+      appBar: AppBar(title: Text("Reports"),backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,),
       body: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -39,7 +40,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             Text("Total Bookings: $totalBookings", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             SizedBox(height: 10),
-            Text("Total Revenue: \$${totalRevenue.toStringAsFixed(2)}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text("Total Revenue: ₹${totalRevenue.toStringAsFixed(2)}",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+
           ],
         ),
       ),

@@ -27,6 +27,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       appBar: AppBar(
         title: Text("My Bookings"),
         backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,
         leading: IconButton( // ✅ Back Button
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () {

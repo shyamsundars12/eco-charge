@@ -205,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 40),
 
                   // Login Button
                   _isLoading
@@ -226,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 40),
 
                   const Text("Don't have an account?"),
                   TextButton(
@@ -237,10 +237,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Text("Sign up here"),
                   ),
                   SizedBox(height: 10),
-                  Text("Or continue with"),
-                  SizedBox(height: 10),
+                 /* Text("Or continue with"),
+                  SizedBox(height: 10),*/
 
-                  Row(
+                 /* Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
@@ -256,7 +256,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         icon: Icon(Icons.apple, size: 40, color: Colors.black),
                       ),
                     ],
-                  ),
+                  ),*/
                 ],
               ),
             ),

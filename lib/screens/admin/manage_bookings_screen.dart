@@ -11,7 +11,8 @@ class ManageBookingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Manage Bookings")),
+      appBar: AppBar(title: Text("Manage Bookings") ,backgroundColor: Color(0xFF0033AA),
+      foregroundColor: Colors.white,),
       body: StreamBuilder(
         stream: bookings.snapshots(),
         builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {

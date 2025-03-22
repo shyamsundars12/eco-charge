@@ -59,55 +59,98 @@ class _AddOwnerScreenState extends State<AddOwnerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF001F54),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text("Add EV Owner", style: TextStyle(color: Colors.white)),
         backgroundColor: Color(0xFF0033AA),
         iconTheme: IconThemeData(color: Colors.white),
       ),
-      body: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: emailController,
-              style: TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: "Owner Email",
-                labelStyle: TextStyle(color: Colors.white70),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(height: 10),
+
+              // **Enhanced Image**
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    "assets/images/evowner.jpg",
+                    height: 200,
+                    width: 220,
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
-            ),
-            SizedBox(height: 15),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              style: TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: "Password",
-                labelStyle: TextStyle(color: Colors.white70),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+
+              SizedBox(height: 50),
+
+              // **Owner Email Field**
+              TextField(
+                controller: emailController,
+                style: TextStyle(color: Color(0xFF0033AA)),
+                decoration: InputDecoration(
+                  labelText: "Owner Email",
+                  labelStyle: TextStyle(color: Color(0xFF0033AA)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.2),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: Icon(Icons.email, color: Color(0xFF0033AA)),
+                  contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                ),
               ),
-            ),
-            SizedBox(height: 25),
-            ElevatedButton(
-              onPressed: isLoading ? null : createOwner,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF0033AA),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+
+              SizedBox(height: 20),
+
+              // **Password Field**
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                style: TextStyle(color: Color(0xFF0033AA)),
+                decoration: InputDecoration(
+                  labelText: "Password",
+                  labelStyle: TextStyle(color: Color(0xFF0033AA)),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.2),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  prefixIcon: Icon(Icons.lock, color: Color(0xFF0033AA)),
+                  contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                ),
               ),
-              child: isLoading
-                  ? CircularProgressIndicator(color: Colors.white)
-                  : Text("Create Owner Account", style: TextStyle(fontSize: 16)),
-            ),
-          ],
+
+              SizedBox(height: 30),
+
+              // **Larger Create Owner Button**
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: isLoading ? null : createOwner,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF0033AA),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 18),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: isLoading
+                      ? CircularProgressIndicator(color: Colors.white)
+                      : Text("Create Owner Account", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

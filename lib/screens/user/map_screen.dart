@@ -43,7 +43,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if (mapController != null) {
       mapController!.animateCamera(
-        CameraUpdate.newCameraPosition(CameraPosition(target: _initialPosition, zoom: 10)),
+        CameraUpdate.newCameraPosition(CameraPosition(target: _initialPosition, zoom: 13)),
       );
     }
   }
@@ -58,9 +58,10 @@ class _MapScreenState extends State<MapScreen> {
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
           infoWindow: InfoWindow(
             title: doc['name'],
-            snippet: "\$${doc['price_per_kwh']}/kWh",
+            snippet: "₹${doc['price_per_kwh']}/kWh", // ✅ Changed from $ to ₹
             onTap: () => _showStationDetails(doc.id, doc),
           ),
+
         );
       }).toSet();
     });
@@ -94,10 +95,11 @@ class _MapScreenState extends State<MapScreen> {
               Padding(
                 padding: EdgeInsets.only(left: 20),
                 child: Text(
-                  "Price: \$${doc['price_per_kwh']}/kWh",
+                  "Price: ₹${doc['price_per_kwh']}/kWh", // ✅ Changed from $ to ₹
                   style: TextStyle(fontSize: 16, color: Colors.black),
                 ),
               ),
+
               SizedBox(height: 20),
               Padding(
                 padding: EdgeInsets.only(left: 20),

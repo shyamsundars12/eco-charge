@@ -83,7 +83,8 @@ class _ManageSlotsScreenState extends State<ManageSlotsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Manage Charging Slots"),
-        backgroundColor: Colors.blue,
+        backgroundColor: Color(0xFF0033AA),
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -116,16 +117,25 @@ class _ManageSlotsScreenState extends State<ManageSlotsScreen> {
                       },
                     ),
                     const SizedBox(height: 10),
-                    ElevatedButton.icon(
-                      onPressed: generateSlots,
-                      icon: Icon(Icons.calendar_month, color: Colors.white),
-                      label: Text("Generate Slots for 7 Days"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        textStyle: TextStyle(fontSize: 16),
+                    SizedBox(
+                      width: double.infinity, // Makes button full width
+                      child: ElevatedButton.icon(
+                        onPressed: generateSlots,
+                        icon: Icon(Icons.calendar_month, color: Colors.white),
+                        label: Text("Generate Slots for 7 Days", style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF0033AA),
+                          foregroundColor: Colors.white,
+                          padding: EdgeInsets.symmetric(vertical: 14), // Increased padding for better look
+                          textStyle: TextStyle(fontSize: 18), // Slightly larger font for better readability
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10), // Rounded corners
+                          ),
+                          elevation: 5, // Adds a subtle shadow effect
+                        ),
                       ),
-                    ),
+                    )
+
                   ],
                 ),
               ),
@@ -162,7 +172,7 @@ class _ManageSlotsScreenState extends State<ManageSlotsScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         elevation: 2,
                         child: ListTile(
-                          leading: Icon(Icons.access_time, color: Colors.green),
+                          leading: Icon(Icons.access_time, color: Color(0xFF0033AA),),
                           title: Text(
                             doc['time'],
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
