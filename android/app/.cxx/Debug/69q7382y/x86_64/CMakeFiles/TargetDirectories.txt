@@ -1,0 +1,2 @@
+C:/Users/muthu/AndroidStudioProjects/ecocharge/android/app/.cxx/Debug/69q7382y/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/muthu/AndroidStudioProjects/ecocharge/android/app/.cxx/Debug/69q7382y/x86_64/CMakeFiles/rebuild_cache.dir

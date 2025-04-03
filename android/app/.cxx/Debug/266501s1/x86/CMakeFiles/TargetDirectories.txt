@@ -1,0 +1,2 @@
+D:/backupss/ecocharge/android/app/.cxx/Debug/266501s1/x86/CMakeFiles/edit_cache.dir
+D:/backupss/ecocharge/android/app/.cxx/Debug/266501s1/x86/CMakeFiles/rebuild_cache.dir

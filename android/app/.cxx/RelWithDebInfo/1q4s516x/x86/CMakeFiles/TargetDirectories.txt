@@ -1,0 +1,2 @@
+C:/Users/muthu/AndroidStudioProjects/ecocharge/android/app/.cxx/RelWithDebInfo/1q4s516x/x86/CMakeFiles/edit_cache.dir
+C:/Users/muthu/AndroidStudioProjects/ecocharge/android/app/.cxx/RelWithDebInfo/1q4s516x/x86/CMakeFiles/rebuild_cache.dir

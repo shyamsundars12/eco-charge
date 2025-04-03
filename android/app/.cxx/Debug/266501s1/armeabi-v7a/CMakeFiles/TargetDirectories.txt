@@ -1,0 +1,2 @@
+D:/backupss/ecocharge/android/app/.cxx/Debug/266501s1/armeabi-v7a/CMakeFiles/edit_cache.dir
+D:/backupss/ecocharge/android/app/.cxx/Debug/266501s1/armeabi-v7a/CMakeFiles/rebuild_cache.dir

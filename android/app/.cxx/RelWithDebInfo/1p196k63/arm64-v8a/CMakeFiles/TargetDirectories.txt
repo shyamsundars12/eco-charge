@@ -1,0 +1,2 @@
+F:/ev_lc/ecocharge/android/app/.cxx/RelWithDebInfo/1p196k63/arm64-v8a/CMakeFiles/edit_cache.dir
+F:/ev_lc/ecocharge/android/app/.cxx/RelWithDebInfo/1p196k63/arm64-v8a/CMakeFiles/rebuild_cache.dir

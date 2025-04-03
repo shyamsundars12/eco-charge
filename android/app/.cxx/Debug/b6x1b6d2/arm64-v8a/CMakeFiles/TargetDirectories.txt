@@ -1,0 +1,2 @@
+C:/Users/muthu/Downloads/ecocharge/android/app/.cxx/Debug/b6x1b6d2/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/muthu/Downloads/ecocharge/android/app/.cxx/Debug/b6x1b6d2/arm64-v8a/CMakeFiles/rebuild_cache.dir
