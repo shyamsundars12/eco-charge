@@ -18,34 +18,24 @@ class LoginScreen extends StatefulWidget {
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
-
 class _LoginScreenState extends State<LoginScreen> {
   final AuthService _authService = AuthService(); // Instance of AuthService
-// Controller for email input
   final _emailController = TextEditingController();
-  // Controller for password input
   final _passwordController = TextEditingController();
-  // To show spinner during login
   bool _isLoading = false;
-
-  // Login function to handle user authentication
   void _login() async {
     setState(() {
-      _isLoading = true; // Show spinner
+      _isLoading = true;
 
     });
-
-    // Call login method from AuthService with user inputs
     String? result = await _authService.login(
       email: _emailController.text,
       password: _passwordController.text,
     );
 
     setState(() {
-      _isLoading = false; // Hide spinner
+      _isLoading = false;
     });
-
-    // Navigate based on role or show error message
     if (result == 'Admin') {
       Navigator.pushReplacement(
         context,
@@ -69,55 +59,13 @@ class _LoginScreenState extends State<LoginScreen> {
     ),
       );
     }
-
     else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Login Failed: $result'), // Show error message
+        content: Text('Login Failed: $result'),
       ));
     }
   }
-
   bool isPasswordHidden = true;
-
-  Future<void> _navigateBasedOnRole(String userId, BuildContext context) async {
-    try {
-      DocumentSnapshot userDoc =
-      await FirebaseFirestore.instance.collection('users').doc(userId).get();
-
-      if (userDoc.exists) {
-        String role = userDoc['role'] ?? '';
-
-        if (role.isEmpty) throw Exception("User role not found in Firestore!");
-
-        Widget destination;
-        if (role == 'user') {
-          destination =  MapScreen();
-        } else if (role == 'admin') {
-          destination =  OwnerDashboard();
-        } else if (role == 'owner') {
-          destination =  OwnerDashboard();
-        } else {
-          throw Exception("Invalid role found in Firestore: $role");
-        }
-
-        if (!mounted) return;
-        Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (context) => destination));
-      } else {
-        throw Exception("User document not found in Firestore!");
-      }
-    } catch (e) {
-      _showError("Error retrieving user role: ${e.toString()}");
-    }
-  }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

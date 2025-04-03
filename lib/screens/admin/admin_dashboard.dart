@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../main.dart';
 import '../user/signup_screen.dart';
 import 'add_owner_screen.dart';
-import 'manage_stations_screen.dart';
+import 'manage_station_screen.dart';
 import 'manage_bookings_screen.dart';
 import 'reports_screen.dart';
 
@@ -77,7 +77,7 @@ class AdminDashboard extends StatelessWidget {
               child: Column(
                 children: [
                   _buildCard(context, "Manage Owners", Icons.supervisor_account, AddOwnerScreen()),
-                  _buildCard(context, "Manage Stations", Icons.ev_station, ManageStationsScreen()),
+                  _buildCard(context, "Manage Stations", Icons.ev_station, ManageStationScreen()),
                   _buildCard(context, "Manage Bookings", Icons.book_online, ManageBookingsScreen()),
                   _buildCard(context, "Reports", Icons.analytics, ReportsScreen()),
                 ],

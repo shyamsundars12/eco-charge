@@ -9,191 +9,417 @@ class ManageSlotsScreen extends StatefulWidget {
 }
 
 class _ManageSlotsScreenState extends State<ManageSlotsScreen> {
-  String? selectedStationId;
-  String? ownerEmail;
-  List<String> ownerStations = [];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  String? _ownerEmail;
+  String? _selectedStationId;
+  List<String> _stationIds = [];
+  List<String> _stationNames = [];
+  bool _isGeneratingSlots = false;
 
   @override
   void initState() {
     super.initState();
-    fetchOwnerStations();
+    _ownerEmail = _auth.currentUser?.email;
+    _loadOwnerStations();
+    _setupAutomaticSlotManagement();
   }
 
-  Future<void> fetchOwnerStations() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      setState(() {
-        ownerEmail = user.email;
-      });
+  Future<void> _loadOwnerStations() async {
+    if (_ownerEmail == null) return;
 
-      QuerySnapshot stationSnapshot = await FirebaseFirestore.instance
+    try {
+      QuerySnapshot stationsSnapshot = await _firestore
           .collection('ev_stations')
-          .where('owner_email', isEqualTo: ownerEmail)
+          .where('owner_email', isEqualTo: _ownerEmail)
           .get();
 
       setState(() {
-        ownerStations = stationSnapshot.docs.map((doc) => doc.id).toList();
-        if (ownerStations.isNotEmpty) {
-          selectedStationId = ownerStations.first;
-        }
+        _stationIds = stationsSnapshot.docs.map((doc) => doc.id).toList();
+        _stationNames = stationsSnapshot.docs.map((doc) => doc['name'] as String).toList();
       });
+    } catch (e) {
+      print('Error loading stations: $e');
     }
   }
 
-  Future<void> generateSlots() async {
-    if (selectedStationId == null) return;
-
-    final firestore = FirebaseFirestore.instance;
+  Future<void> _setupAutomaticSlotManagement() async {
+    // Run this every day at midnight
     DateTime now = DateTime.now();
+    DateTime nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    Duration timeUntilMidnight = nextMidnight.difference(now);
 
-    for (int i = 0; i < 7; i++) {
-      DateTime date = now.add(Duration(days: i));
-      String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+    // Wait until midnight
+    await Future.delayed(timeUntilMidnight);
 
-      for (int hour = 8; hour < 20; hour++) {
-        for (int min = 0; min < 60; min += 30) {
-          String slotTime = "${hour.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}";
+    // Run the cleanup and generation
+    await _cleanupAndGenerateSlots();
 
-          await firestore
-              .collection('charging_slots')
-              .doc(selectedStationId)
-              .collection(formattedDate)
-              .doc(slotTime)
-              .set({'time': slotTime, 'status': 'available'});
+    // Schedule next run
+    _setupAutomaticSlotManagement();
+  }
+
+  Future<void> _cleanupAndGenerateSlots() async {
+    if (_ownerEmail == null) return;
+
+    try {
+      // Get all stations owned by this user
+      QuerySnapshot stationsSnapshot = await _firestore
+          .collection('ev_stations')
+          .where('owner_email', isEqualTo: _ownerEmail)
+          .get();
+
+      for (var stationDoc in stationsSnapshot.docs) {
+        String stationId = stationDoc.id;
+        DateTime now = DateTime.now();
+        String today = DateFormat('yyyy-MM-dd').format(now);
+
+        // Delete slots from past dates
+        QuerySnapshot pastSlots = await _firestore
+            .collection('charging_slots')
+            .doc(stationId)
+            .collection('slots')
+            .where('date', isLessThan: today)
+            .get();
+
+        // Delete past slots in batches
+        for (var doc in pastSlots.docs) {
+          await doc.reference.delete();
+        }
+
+        // Generate slots for next 7 days
+        await _generateSlotsForStation(stationId);
+      }
+    } catch (e) {
+      print('Error in automatic slot management: $e');
+    }
+  }
+
+  Future<void> _generateSlotsForStation(String stationId) async {
+    try {
+      DateTime now = DateTime.now();
+      for (int i = 0; i < 7; i++) {
+        DateTime date = now.add(Duration(days: i));
+        String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+
+        // Check if slots already exist for this date
+        QuerySnapshot existingSlots = await _firestore
+            .collection('charging_slots')
+            .doc(stationId)
+            .collection('slots')
+            .where('date', isEqualTo: formattedDate)
+            .get();
+
+        if (existingSlots.docs.isEmpty) {
+          // Generate slots for each day from 8 AM to 8 PM with 30-minute intervals
+          for (int hour = 8; hour < 20; hour++) {
+            for (int min = 0; min < 60; min += 30) {
+              String slotTime = "${hour.toString().padLeft(2, '0')}:${min.toString().padLeft(2, '0')}";
+              String slotId = "${formattedDate}_$slotTime";
+              
+              await _firestore
+                  .collection('charging_slots')
+                  .doc(stationId)
+                  .collection('slots')
+                  .doc(slotId)
+                  .set({
+                'date': formattedDate,
+                'time': slotTime,
+                'status': 'available',
+                'created_at': FieldValue.serverTimestamp(),
+                'sort_key': slotId,
+              });
+            }
+          }
         }
       }
+    } catch (e) {
+      print('Error generating slots for station $stationId: $e');
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Slots generated successfully!")),
-    );
   }
 
-  void removeSlot(String date, String slotId) {
-    FirebaseFirestore.instance
-        .collection('charging_slots')
-        .doc(selectedStationId)
-        .collection(date)
-        .doc(slotId)
-        .delete();
+  Future<void> _generateSlotsFor7Days() async {
+    if (_selectedStationId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Please select a station first')),
+      );
+      return;
+    }
+
+    setState(() => _isGeneratingSlots = true);
+
+    try {
+      await _generateSlotsForStation(_selectedStationId!);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Slots generated successfully for 7 days')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error generating slots: $e')),
+      );
+    } finally {
+      setState(() => _isGeneratingSlots = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Manage Charging Slots"),
+        title: Text('Manage Slots'),
         backgroundColor: Color(0xFF0033AA),
         foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // Dropdown & Button Section
-            Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 3,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Select EV Station:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    DropdownButton<String>(
-                      value: selectedStationId,
-                      isExpanded: true,
-                      items: ownerStations.map((stationId) {
-                        return DropdownMenuItem<String>(
-                          value: stationId,
-                          child: Text(stationId, style: TextStyle(fontSize: 14)),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedStationId = value;
-                        });
-                      },
+      body: Column(
+        children: [
+          // Station Selection Dropdown
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                DropdownButtonFormField<String>(
+                  value: _selectedStationId,
+                  decoration: InputDecoration(
+                    labelText: 'Select Station',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.ev_station),
+                  ),
+                  items: List.generate(
+                    _stationIds.length,
+                    (index) => DropdownMenuItem(
+                      value: _stationIds[index],
+                      child: Text(_stationNames[index]),
                     ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity, // Makes button full width
-                      child: ElevatedButton.icon(
-                        onPressed: generateSlots,
-                        icon: Icon(Icons.calendar_month, color: Colors.white),
-                        label: Text("Generate Slots for 7 Days", style: TextStyle(fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF0033AA),
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 14), // Increased padding for better look
-                          textStyle: TextStyle(fontSize: 18), // Slightly larger font for better readability
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10), // Rounded corners
-                          ),
-                          elevation: 5, // Adds a subtle shadow effect
-                        ),
-                      ),
-                    )
-
-                  ],
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedStationId = value;
+                    });
+                  },
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Slots List Section
-            Expanded(
-              child: selectedStationId == null
-                  ? Center(
-                child: Text(
-                  "No assigned EV stations found.",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.redAccent),
-                ),
-              )
-                  : StreamBuilder(
-                stream: FirebaseFirestore.instance
-                    .collection('charging_slots')
-                    .doc(selectedStationId)
-                    .collection(DateFormat('yyyy-MM-dd').format(DateTime.now()))
-                    .snapshots(),
-                builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-                  if (!snapshot.hasData) return Center(child: CircularProgressIndicator());
-                  if (snapshot.data!.docs.isEmpty) {
-                    return Center(child: Text("No slots available for today."));
-                  }
-
-                  return ListView.builder(
-                    itemCount: snapshot.data!.docs.length,
-                    itemBuilder: (context, index) {
-                      var doc = snapshot.data!.docs[index];
-                      return Card(
-                        margin: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        elevation: 2,
-                        child: ListTile(
-                          leading: Icon(Icons.access_time, color: Color(0xFF0033AA),),
-                          title: Text(
-                            doc['time'],
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                          trailing: IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => removeSlot(
-                              DateFormat('yyyy-MM-dd').format(DateTime.now()),
-                              doc.id,
+                SizedBox(height: 16),
+                if (_selectedStationId != null)
+                  ElevatedButton.icon(
+                    onPressed: _isGeneratingSlots ? null : _generateSlotsFor7Days,
+                    icon: _isGeneratingSlots 
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
+                          )
+                        : Icon(Icons.calendar_month),
+                    label: Text(_isGeneratingSlots ? 'Generating Slots...' : 'Generate Slots for 7 Days'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF0033AA),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Slots List
+          Expanded(
+            child: _selectedStationId == null
+                ? Center(
+                    child: Text('Please select a station to manage slots'),
+                  )
+                : StreamBuilder<QuerySnapshot>(
+                    stream: _firestore
+                        .collection('charging_slots')
+                        .doc(_selectedStationId)
+                        .collection('slots')
+                        .orderBy('sort_key')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      }
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('No slots found for this station'),
+                              SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _isGeneratingSlots ? null : _generateSlotsFor7Days,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Color(0xFF0033AA),
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: Text(_isGeneratingSlots ? 'Generating...' : 'Generate Slots for 7 Days'),
+                              ),
+                            ],
                           ),
-                        ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        padding: EdgeInsets.all(16),
+                        itemCount: snapshot.data!.docs.length,
+                        itemBuilder: (context, index) {
+                          var doc = snapshot.data!.docs[index];
+                          var data = doc.data() as Map<String, dynamic>;
+                          
+                          return Card(
+                            margin: EdgeInsets.only(bottom: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              title: Text(
+                                '${data['date'] ?? 'N/A'} - ${data['time'] ?? 'N/A'}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0033AA),
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Status: ${data['status'] ?? 'Unknown'}',
+                                style: TextStyle(
+                                  color: _getStatusColor(data['status']),
+                                ),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.edit, color: Color(0xFF0033AA)),
+                                    onPressed: () => _showEditSlotDialog(context, doc.id, data),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _showDeleteConfirmation(context, doc.id),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+                  ),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _showEditSlotDialog(BuildContext context, String slotId, Map<String, dynamic> data) async {
+    final formKey = GlobalKey<FormState>();
+    String status = data['status'] ?? 'available';
+
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Edit Slot ${data['date']} - ${data['time']}'),
+        content: Form(
+          key: formKey,
+          child: DropdownButtonFormField<String>(
+            value: status,
+            decoration: InputDecoration(labelText: 'Status'),
+            items: [
+              DropdownMenuItem(value: 'available', child: Text('Available')),
+              DropdownMenuItem(value: 'occupied', child: Text('Occupied')),
+              DropdownMenuItem(value: 'maintenance', child: Text('Maintenance')),
+            ],
+            onChanged: (value) => status = value!,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await _firestore
+                    .collection('charging_slots')
+                    .doc(_selectedStationId)
+                    .collection('slots')
+                    .doc(slotId)
+                    .update({
+                  'status': status,
+                  'updated_at': FieldValue.serverTimestamp(),
+                });
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error updating slot: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF0033AA),
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDeleteConfirmation(BuildContext context, String slotId) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Slot'),
+        content: Text('Are you sure you want to delete this slot?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                await _firestore
+                    .collection('charging_slots')
+                    .doc(_selectedStationId)
+                    .collection('slots')
+                    .doc(slotId)
+                    .delete();
+                Navigator.pop(context);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error deleting slot: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'available':
+        return Colors.green;
+      case 'occupied':
+        return Colors.blue;
+      case 'maintenance':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
   }
 }

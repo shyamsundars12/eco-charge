@@ -1,3 +1,4 @@
+import 'package:ecocharge/screens/admin/manage_station_screen.dart';
 import 'package:ecocharge/screens/user/login_screen.dart';
 import 'package:ecocharge/screens/user/map_screen.dart';
 import 'package:ecocharge/services/notification_service.dart';
@@ -5,6 +6,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
+import 'package:ecocharge/screens/user/map_screen.dart';
 
 import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
@@ -13,8 +15,8 @@ import 'providers/station_provider.dart';
 import 'screens/admin/admin_dashboard.dart';
 import 'screens/owner/owner_dashboard.dart';
 import 'screens/admin/add_owner_screen.dart';
-import 'screens/admin/manage_stations_screen.dart';
 import 'screens/admin/manage_bookings_screen.dart';
+import 'screens/admin/owner_wise_reports_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,8 +55,9 @@ class EcoChargeApp extends StatelessWidget {
         '/admin_dashboard': (context) => AdminDashboard(),
         '/owner_dashboard': (context) => OwnerDashboard(),
         '/manage_owners': (context) => AddOwnerScreen(),
-        '/manage_stations': (context) => ManageStationsScreen(),
+        '/manage_stations': (context) => ManageStationScreen(),
         '/manage_bookings': (context) => ManageBookingsScreen(),
+        '/owner_wise_reports': (context) => OwnerWiseReportsScreen(),
         '/login': (context) => LoginScreen(),
         '/map': (context) => MapScreen(),
       },

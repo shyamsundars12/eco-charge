@@ -39,6 +39,9 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
@@ -47,11 +50,16 @@ flutter {
     source = "../.."
 }
 dependencies {
+//    configurations.all {
+//        resolutionStrategy {
+//            force 'com.google.android.play:core:1.10.3'
+//            force 'com.google.android.play:core-common:1.10.3'
+//        }
+//    }
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")  // ✅ Correct usage
-
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.0.21")
-    implementation("com.google.firebase:firebase-messaging:24.1.0")
-
+    implementation 'com.razorpay:checkout:1.6.41' // Update to latest version
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:2.1.20")
+    implementation("com.google.firebase:firebase-messaging:24.1.1")
     // Other dependencies...
 }
 

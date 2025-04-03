@@ -8,13 +8,14 @@
 
     <application
         android:label="ecocharge"
+        android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
 
         <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_API_KEY_HERE"/>
+            android:value="AIzaSyDIREeT6v67_f7FcJ5WhdT82Lvmwru0FM8"/>
 
         <activity
             android:name=".MainActivity"
@@ -23,6 +24,7 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
+            android:enableOnBackInvokedCallback="true"
             android:windowSoftInputMode="adjustResize">
 
             <meta-data
@@ -33,7 +35,12 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
         </activity>
+
+
+
+
 
         <!-- Required by Flutter -->
         <meta-data
