@@ -9,12 +9,14 @@ class VehicleDetailsScreen extends StatefulWidget {
   final String slotTime;
   final String selectedDate;
   final String slotId;
+  final String pointId;
   const VehicleDetailsScreen({
     Key? key,
     required this.stationId,
     required this.slotTime,
     required this.selectedDate,
     required this.slotId,
+    required this.pointId,
   }
   ) : super(key: key);
 
@@ -33,16 +35,12 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   final TextEditingController _chargingCapacityController = TextEditingController();
 
   Future<void> _proceedToPayment() async {
-    if (_formKey.currentState!.validate()) {
+    if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isLoading = true);
 
       try {
-        // Get current user
-        final user = _auth.currentUser;
-        if (user == null) throw Exception('User not logged in');
-
-        // Get station details to calculate amount
-        final stationDoc = await _firestore
+        // Get station details for price calculation
+        DocumentSnapshot stationDoc = await _firestore
             .collection('ev_stations')
             .doc(widget.stationId)
             .get();
@@ -51,13 +49,15 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
           throw Exception('Station not found');
         }
 
-        final stationData = stationDoc.data() as Map<String, dynamic>;
-        final pricePerKwh = stationData['price_per_kwh'] ?? 0.0;
-        final chargingCapacity = double.parse(_chargingCapacityController.text);
-        final amount = pricePerKwh * chargingCapacity;
+        Map<String, dynamic> stationData = stationDoc.data() as Map<String, dynamic>;
+        double pricePerKwh = (stationData['price_per_kwh'] as num?)?.toDouble() ?? 0.0;
 
-        // Get slot details to verify status
-        final slotDoc = await _firestore
+        // Calculate amount based on charging capacity
+        double chargingCapacity = double.parse(_chargingCapacityController.text);
+        double amount = chargingCapacity * pricePerKwh;
+
+        // Get slot details and verify charging point status
+        DocumentSnapshot slotDoc = await _firestore
             .collection('charging_slots')
             .doc(widget.stationId)
             .collection('slots')
@@ -68,22 +68,46 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
           throw Exception('Slot not found');
         }
 
-        final slotData = slotDoc.data() as Map<String, dynamic>;
-        if (slotData['status'] != 'pending') {
-          throw Exception('This slot is no longer available');
+        Map<String, dynamic> slotData = slotDoc.data() as Map<String, dynamic>;
+        List<dynamic> chargingPoints = List.from(slotData['charging_points'] ?? []);
+
+        // Find and verify the selected charging point
+        bool pointFound = false;
+        for (int i = 0; i < chargingPoints.length; i++) {
+          if (chargingPoints[i]['id'].toString() == widget.pointId) {
+            if (chargingPoints[i]['status'] != 'pending' || chargingPoints[i]['pending_by'] != _auth.currentUser!.uid) {
+              throw Exception('This charging point is no longer available for booking');
+            }
+            chargingPoints[i]['status'] = 'booked';
+            pointFound = true;
+            break;
+          }
         }
 
+        if (!pointFound) {
+          throw Exception('Charging point not found');
+        }
+
+        // Update the slot with the modified charging points
+        await _firestore
+            .collection('charging_slots')
+            .doc(widget.stationId)
+            .collection('slots')
+            .doc(widget.slotId)
+            .update({
+          'charging_points': chargingPoints,
+          'updated_at': FieldValue.serverTimestamp(),
+        });
+
         // Create booking record
-        DocumentReference bookingRef = await _firestore
-            .collection('users')
-            .doc(user.uid)
-            .collection('bookings')
-            .add({
+        DocumentReference bookingRef = await _firestore.collection('bookings').add({
+          'user_id': _auth.currentUser!.uid,
           'station_id': widget.stationId,
           'slot_id': widget.slotId,
+          'point_id': widget.pointId,
           'vehicle_number': _vehicleNumberController.text,
           'vehicle_model': _vehicleModelController.text,
-          'charging_capacity': _chargingCapacityController.text,
+          'charging_capacity': chargingCapacity,
           'amount': amount,
           'status': 'pending',
           'date': widget.selectedDate,
@@ -92,38 +116,33 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
           'updated_at': FieldValue.serverTimestamp(),
         });
 
-        if (mounted) {
-          // Navigate to payment screen
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PaymentScreen(
-                stationId: widget.stationId,
-                vehicleNumber: _vehicleNumberController.text,
-                vehicleModel: _vehicleModelController.text,
-                chargingCapacity: _chargingCapacityController.text,
-                slotTime: widget.slotTime,
-                amount: amount,
-                bookingId: bookingRef.id,
-                slotId: widget.slotId,
-                date: widget.selectedDate,
-              ),
+        // Navigate to payment screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentScreen(
+              bookingId: bookingRef.id,
+              amount: amount,
+              stationId: widget.stationId,
+              slotId: widget.slotId,
+              pointId: widget.pointId,
+              vehicleNumber: _vehicleNumberController.text,
+              vehicleModel: _vehicleModelController.text,
+              chargingCapacity: _chargingCapacityController.text,
+              slotTime: widget.slotTime,
+              date: widget.selectedDate,
             ),
-          );
-        }
+          ),
+        );
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -132,85 +151,101 @@ class _VehicleDetailsScreenState extends State<VehicleDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Enter Vehicle Details"),
+        title: const Text('Vehicle Details'),
         backgroundColor: const Color(0xFF0033AA),
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Image.asset(
-              'assets/images/vehicle_details.jpg',
-              height: 180,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            ),
-            const SizedBox(height: 60),
-            Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    controller: _vehicleNumberController,
-                    decoration: const InputDecoration(
-                      labelText: "Vehicle Number",
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.directions_car),
+              padding: const EdgeInsets.all(16.0),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Image.asset(
+                      'assets/images/vehicle_details.jpg',
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
                     ),
-                    validator: (value) => value!.isEmpty ? "Enter vehicle number" : null,
-                  ),
-                  const SizedBox(height: 15),
-                  TextFormField(
-                    controller: _vehicleModelController,
-                    decoration: const InputDecoration(
-                      labelText: "Vehicle Model",
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.electric_car),
-                    ),
-                    validator: (value) => value!.isEmpty ? "Enter vehicle model" : null,
-                  ),
-                  const SizedBox(height: 15),
-                  TextFormField(
-                    controller: _chargingCapacityController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: "Charging Capacity (kWh)",
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.battery_charging_full),
-                    ),
-                    validator: (value) => value!.isEmpty ? "Enter charging capacity" : null,
-                  ),
-                  const SizedBox(height: 30),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _proceedToPayment,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0033AA),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        textStyle: const TextStyle(fontSize: 18),
+                    const SizedBox(height: 60),
+                    TextFormField(
+                      controller: _vehicleNumberController,
+                      decoration: const InputDecoration(
+                        labelText: 'Vehicle Number',
+                        border: OutlineInputBorder(),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.payment, color: Colors.white),
-                          SizedBox(width: 8),
-                          Text("Proceed to Payment"),
-                        ],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter vehicle number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _vehicleModelController,
+                      decoration: const InputDecoration(
+                        labelText: 'Vehicle Model',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter vehicle model';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _chargingCapacityController,
+                      decoration: const InputDecoration(
+                        labelText: 'Charging Capacity (kWh)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter charging capacity';
+                        }
+                        if (double.tryParse(value) == null) {
+                          return 'Please enter a valid number';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _proceedToPayment,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0033AA),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : const Text('Proceed to Payment', style: TextStyle(fontSize: 18)),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 }

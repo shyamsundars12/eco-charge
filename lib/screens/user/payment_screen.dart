@@ -17,6 +17,7 @@ class PaymentScreen extends StatefulWidget {
   final String bookingId;
   final String slotId;
   final String date;
+  final String pointId;
 
   const PaymentScreen({
     Key? key,
@@ -29,6 +30,7 @@ class PaymentScreen extends StatefulWidget {
     required this.bookingId,
     required this.slotId,
     required this.date,
+    required this.pointId,
   }) : super(key: key);
 
   @override
@@ -47,10 +49,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void initState() {
     super.initState();
     _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (PaymentSuccessResponse response) {
+      _handlePaymentSuccess(response);
+    });
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (PaymentFailureResponse response) {
+      _handlePaymentError(response);
+    });
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, (ExternalWalletResponse response) {
+      _handleExternalWallet(response);
+    });
     _fetchStationName();
+    _startPaymentTimeout();
   }
 
   Future<void> _fetchStationName() async {
@@ -116,59 +125,128 @@ EcoCharge Team
     try {
       setState(() => _isLoading = true);
 
+      // Get current user
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
       // Create booking document
-      final bookingRef = _firestore.collection('bookings').doc();
-      
-      // Get current timestamp
-      final now = DateTime.now();
-      final timestamp = Timestamp.fromDate(now);
-
-      // Create booking data
-      final bookingData = {
-        'amount': widget.amount,
-        'cancelledAt': null, // Will be set when cancelled
-        'chargingCapacity': widget.chargingCapacity,
+      DocumentReference bookingRef = await _firestore.collection('bookings').add({
+        'user_id': user.uid,
+        'station_id': widget.stationId,
+        'slot_id': widget.slotId,
+        'point_id': widget.pointId,
         'date': widget.date,
-        'paymentId': response.paymentId,
-        'paymentStatus': 'success',
-        'paymentTimestamp': timestamp,
-        'slotTime': widget.slotTime,
-        'stationId': widget.stationId,
+        'time': widget.slotTime,
+        'vehicle_number': widget.vehicleNumber,
+        'vehicle_model': widget.vehicleModel,
+        'charging_capacity': double.parse(widget.chargingCapacity),
+        'total_amount': widget.amount,
+        'advance_paid': widget.amount * 0.5,
+        'remaining_amount': widget.amount * 0.5,
         'status': 'booked',
-        'timestamp': timestamp,
-        'userId': _auth.currentUser?.uid,
-        'vehicleModel': widget.vehicleModel,
-        'vehicleNumber': widget.vehicleNumber,
-      };
+        'payment_status': 'partial',
+        'payment_id': response.paymentId,
+        'payment_timestamp': FieldValue.serverTimestamp(),
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      });
 
-      // Save booking details
-      await bookingRef.set(bookingData);
+      // Get the slot document
+      DocumentSnapshot slotDoc = await _firestore
+          .collection('charging_slots')
+          .doc(widget.stationId)
+          .collection('slots')
+          .doc(widget.slotId)
+          .get();
 
-      // Update slot status
+      if (!slotDoc.exists) {
+        throw Exception('Slot not found');
+      }
+
+      Map<String, dynamic> slotData = slotDoc.data() as Map<String, dynamic>;
+      List<dynamic> chargingPoints = List.from(slotData['charging_points'] ?? []);
+
+      // Find and update the charging point status
+      bool pointFound = false;
+      for (int i = 0; i < chargingPoints.length; i++) {
+        if (chargingPoints[i]['id'].toString() == widget.pointId) {
+          chargingPoints[i]['status'] = 'booked';
+          chargingPoints[i]['booked_by'] = user.uid;
+          chargingPoints[i]['pending_by'] = null;
+          chargingPoints[i]['updated_at'] = DateTime.now().toIso8601String();
+          pointFound = true;
+          break;
+        }
+      }
+
+      if (!pointFound) {
+        throw Exception('Charging point not found');
+      }
+
+      // Update the slot with the modified charging points
       await _firestore
           .collection('charging_slots')
           .doc(widget.stationId)
           .collection('slots')
-          .doc('${widget.date}_${widget.slotTime}')
+          .doc(widget.slotId)
           .update({
-        'status': 'booked',
-        'booked_by': _auth.currentUser?.uid,
+        'charging_points': chargingPoints,
         'updated_at': FieldValue.serverTimestamp(),
       });
 
-      // Send booking confirmation email
-      await _sendBookingConfirmationEmail();
+      // Get user email for confirmation
+      DocumentSnapshot userDoc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        String userEmail = userDoc.get('email');
+        String stationName = userDoc.get('name') ?? 'Unknown Station';
+        
+        // Send booking confirmation email
+        await _firestore.collection('mail').add({
+          'to': userEmail,
+          'message': {
+            'subject': 'Booking Confirmation - EcoCharge',
+            'text': '''
+            Your booking has been confirmed!
+            
+            Booking Details:
+            Station: $stationName
+            Date: ${widget.date}
+            Time: ${widget.slotTime}
+            Charging Point: ${widget.pointId}
+            Vehicle Number: ${widget.vehicleNumber}
+            Vehicle Model: ${widget.vehicleModel}
+            Charging Capacity: ${widget.chargingCapacity} kWh
+            Total Amount: ₹${widget.amount.toStringAsFixed(2)}
+            Advance Paid: ₹${(widget.amount * 0.5).toStringAsFixed(2)}
+            Remaining Amount: ₹${(widget.amount * 0.5).toStringAsFixed(2)}
+            Payment ID: ${response.paymentId}
+            Booking ID: ${bookingRef.id}
+            
+            Note: Please pay the remaining amount at the station.
+            
+            Thank you for choosing EcoCharge!
+            ''',
+          },
+        });
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('Payment successful! Booking confirmed.'),
             backgroundColor: Colors.green,
           ),
         );
 
+        // Navigate to MyBookingsScreen and clear the navigation stack
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const MyBookingsScreen()),
+          MaterialPageRoute(
+            builder: (context) => const MyBookingsScreen(),
+          ),
           (route) => false,
         );
       }
@@ -176,7 +254,7 @@ EcoCharge Team
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error processing payment: $e'),
+            content: Text('Error confirming booking: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -188,81 +266,180 @@ EcoCharge Team
     }
   }
 
-  void _handlePaymentError(PaymentFailureResponse response) async {
-    try {
-      // Use a transaction to ensure atomic updates
-      await _firestore.runTransaction((transaction) async {
-        // Get the booking document
-        final bookingDoc = await transaction.get(
-          _firestore
-              .collection('users')
-              .doc(_auth.currentUser?.uid)
-              .collection('bookings')
-              .doc(widget.bookingId)
-        );
-
-        if (!bookingDoc.exists) {
-          throw Exception('Booking not found');
-        }
-
-        // Get the slot document
-        final slotDoc = await transaction.get(
-          _firestore
-              .collection('charging_slots')
-              .doc(widget.stationId)
-              .collection('slots')
-              .doc(widget.slotId)
-        );
-
-        if (!slotDoc.exists) {
-          throw Exception('Slot not found');
-        }
-
-        // Update booking status to failed
-        transaction.update(bookingDoc.reference, {
-          'status': 'failed',
-          'payment_status': 'failed',
-          'payment_error': response.message,
-          'payment_timestamp': FieldValue.serverTimestamp(),
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-
-        // Release the slot back to available
-        transaction.update(slotDoc.reference, {
-          'status': 'available',
-          'pending_by': null,
-          'updated_at': FieldValue.serverTimestamp(),
-        });
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payment failed: ${response.message}'), backgroundColor: Colors.red),
-        );
-      }
-    } catch (e) {
-      print('Error handling payment failure: $e');
-    }
+  void _handlePaymentError(PaymentFailureResponse response) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment failed: ${response.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('External wallet selected: ${response.walletName}')),
+      SnackBar(
+        content: Text('External wallet selected: ${response.walletName}'),
+        backgroundColor: Colors.blue,
+      ),
     );
   }
 
+  Future<void> _startPaymentTimeout() async {
+    // Create a temporary booking with pending status
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      DocumentReference bookingRef = await _firestore.collection('bookings').add({
+        'user_id': user.uid,
+        'station_id': widget.stationId,
+        'slot_id': widget.slotId,
+        'point_id': widget.pointId,
+        'date': widget.date,
+        'time': widget.slotTime,
+        'vehicle_number': widget.vehicleNumber,
+        'vehicle_model': widget.vehicleModel,
+        'charging_capacity': double.parse(widget.chargingCapacity),
+        'total_amount': widget.amount,
+        'advance_paid': 0.0,
+        'remaining_amount': widget.amount,
+        'status': 'pending',
+        'payment_status': 'pending',
+        'created_at': FieldValue.serverTimestamp(),
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      // Update the charging point status to pending
+      DocumentSnapshot slotDoc = await _firestore
+          .collection('charging_slots')
+          .doc(widget.stationId)
+          .collection('slots')
+          .doc(widget.slotId)
+          .get();
+
+      if (!slotDoc.exists) {
+        throw Exception('Slot not found');
+      }
+
+      Map<String, dynamic> slotData = slotDoc.data() as Map<String, dynamic>;
+      List<dynamic> chargingPoints = List.from(slotData['charging_points'] ?? []);
+
+      bool pointFound = false;
+      for (int i = 0; i < chargingPoints.length; i++) {
+        if (chargingPoints[i]['id'].toString() == widget.pointId) {
+          chargingPoints[i]['status'] = 'pending';
+          chargingPoints[i]['pending_by'] = user.uid;
+          chargingPoints[i]['updated_at'] = DateTime.now().toIso8601String();
+          pointFound = true;
+          break;
+        }
+      }
+
+      if (!pointFound) {
+        throw Exception('Charging point not found');
+      }
+
+      await _firestore
+          .collection('charging_slots')
+          .doc(widget.stationId)
+          .collection('slots')
+          .doc(widget.slotId)
+          .update({
+        'charging_points': chargingPoints,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      // Set a timeout to release the slot after 5 minutes
+      Future.delayed(const Duration(minutes: 5), () async {
+        // Check if the booking is still pending
+        DocumentSnapshot bookingSnapshot = await bookingRef.get();
+        if (bookingSnapshot.exists && bookingSnapshot['status'] == 'pending') {
+          // Release the slot
+          await _releaseSlot(bookingRef.id);
+        }
+      });
+    } catch (e) {
+      print('Error creating temporary booking: $e');
+    }
+  }
+
+  Future<void> _releaseSlot(String bookingId) async {
+    try {
+      // Get booking details
+      DocumentSnapshot bookingDoc = await _firestore
+          .collection('bookings')
+          .doc(bookingId)
+          .get();
+
+      if (!bookingDoc.exists) return;
+
+      Map<String, dynamic> booking = bookingDoc.data() as Map<String, dynamic>;
+
+      // Get slot document
+      DocumentSnapshot slotDoc = await _firestore
+          .collection('charging_slots')
+          .doc(booking['station_id'])
+          .collection('slots')
+          .doc(booking['slot_id'])
+          .get();
+
+      if (!slotDoc.exists) return;
+
+      Map<String, dynamic> slotData = slotDoc.data() as Map<String, dynamic>;
+      List<dynamic> chargingPoints = List.from(slotData['charging_points'] ?? []);
+
+      // Find and update the charging point status
+      for (int i = 0; i < chargingPoints.length; i++) {
+        if (chargingPoints[i]['id'].toString() == booking['point_id']) {
+          chargingPoints[i]['status'] = 'available';
+          chargingPoints[i]['pending_by'] = null;
+          chargingPoints[i]['updated_at'] = DateTime.now().toIso8601String();
+          break;
+        }
+      }
+
+      // Update the slot
+      await _firestore
+          .collection('charging_slots')
+          .doc(booking['station_id'])
+          .collection('slots')
+          .doc(booking['slot_id'])
+          .update({
+        'charging_points': chargingPoints,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      // Update booking status
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'status': 'cancelled',
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print('Error releasing slot: $e');
+    }
+  }
+
   void _startPayment() {
+    if (_isLoading) return; // Prevent multiple touches
+
+    setState(() => _isLoading = true);
+    
     var options = {
       'key': 'rzp_test_BN58I09Ntf1QYq',
-      'amount': (widget.amount * 100).toInt(),
+      'amount': (widget.amount * 50).toInt(), // 50% of total amount
       'name': 'EcoCharge',
-      'description': 'Charging Station Booking',
-      'prefill': {'contact': '9999999999', 'email': 'user@example.com', 'name': 'User Name'},
+      'description': 'Charging Station Booking - Advance Payment',
+      'prefill': {
+        'contact': '9999999999',
+        'email': _auth.currentUser?.email ?? 'user@example.com',
+      },
+      'theme': {'color': '#0033AA'},
     };
 
     try {
       _razorpay.open(options);
     } catch (e) {
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -282,6 +459,10 @@ EcoCharge Team
         title: const Text('Payment'),
         backgroundColor: const Color(0xFF0033AA),
         foregroundColor: Colors.white,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -305,6 +486,8 @@ EcoCharge Team
                     _buildSummaryRow('Slot Time', widget.slotTime),
                     const Divider(height: 32),
                     _buildSummaryRow('Total Amount', '₹${widget.amount.toStringAsFixed(2)}', isAmount: true),
+                    _buildSummaryRow('Advance Payment (50%)', '₹${(widget.amount * 0.5).toStringAsFixed(2)}', isAmount: true),
+                    _buildSummaryRow('Remaining Amount (Pay at Station)', '₹${(widget.amount * 0.5).toStringAsFixed(2)}', isAmount: true),
                   ],
                 ),
               ),
@@ -313,13 +496,22 @@ EcoCharge Team
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _startPayment,
+                onPressed: _isLoading ? null : _startPayment,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0033AA),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Pay Now', style: TextStyle(fontSize: 18)),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Pay Advance (50%)', style: TextStyle(fontSize: 18)),
               ),
             ),
           ],
