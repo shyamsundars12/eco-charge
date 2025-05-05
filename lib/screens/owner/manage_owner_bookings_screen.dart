@@ -15,7 +15,7 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
   String? _selectedStationId;
   List<String> _stationIds = [];
   List<String> _stationNames = [];
-  String _selectedStatus = 'all'; // 'all', 'active', 'completed', 'cancelled'
+  String _selectedStatus = 'all'; // 'all', 'booked', 'cancelled'
 
   @override
   void initState() {
@@ -36,6 +36,9 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
       setState(() {
         _stationIds = stationsSnapshot.docs.map((doc) => doc.id).toList();
         _stationNames = stationsSnapshot.docs.map((doc) => doc['name'] as String).toList();
+        if (_stationIds.isNotEmpty) {
+          _selectedStationId = _stationIds.first; // Select first station by default
+        }
       });
     } catch (e) {
       print('Error loading stations: $e');
@@ -45,74 +48,30 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
     }
   }
 
-  void _cancelBooking(String bookingId) async {
-    try {
-      await _firestore.collection('bookings').doc(bookingId).update({
-        'status': 'cancelled',
-        'updated_at': FieldValue.serverTimestamp(),
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Booking cancelled successfully')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error cancelling booking: $e')),
-      );
-    }
-  }
-
   Stream<List<QueryDocumentSnapshot>> _getBookingsStream() {
-    if (_ownerEmail == null) {
+    if (_ownerEmail == null || _selectedStationId == null) {
       return Stream.empty();
     }
 
-    // First get all stations owned by this owner
-    return _firestore
-        .collection('ev_stations')
-        .where('owner_email', isEqualTo: _ownerEmail)
-        .snapshots()
-        .asyncMap((stationsSnapshot) async {
-          if (stationsSnapshot.docs.isEmpty) {
-            return [];
-          }
+    // Query bookings for the selected station
+    Query query = _firestore
+        .collection('bookings')
+        .where('station_id', isEqualTo: _selectedStationId)
+        .orderBy('created_at', descending: true);
 
-          // Get all station IDs owned by this owner
-          List<String> stationIds = stationsSnapshot.docs.map((doc) => doc.id).toList();
-          
-          // If a specific station is selected, filter by that station
-          if (_selectedStationId != null) {
-            stationIds = [_selectedStationId!];
-          }
+    return query.snapshots().map((snapshot) {
+      List<QueryDocumentSnapshot> filteredBookings = snapshot.docs;
 
-          // Get bookings for all stations
-          List<QuerySnapshot> bookingSnapshots = await Future.wait(
-            stationIds.map((stationId) => _firestore
-                .collection('bookings')
-                .where('stationId', isEqualTo: stationId)
-                .where('status', isEqualTo: _selectedStatus == 'all' ? null : _selectedStatus)
-                .get()),
-          );
+      // Filter by status if not 'all'
+      if (_selectedStatus != 'all') {
+        filteredBookings = filteredBookings.where((doc) {
+          var data = doc.data() as Map<String, dynamic>;
+          return data['status']?.toString().toLowerCase() == _selectedStatus.toLowerCase();
+        }).toList();
+      }
 
-          // Combine all bookings into a single list
-          List<QueryDocumentSnapshot> allBookings = [];
-          for (var snapshot in bookingSnapshots) {
-            allBookings.addAll(snapshot.docs);
-          }
-
-          // Sort bookings by date
-          allBookings.sort((a, b) {
-            var aData = a.data() as Map<String, dynamic>;
-            var bData = b.data() as Map<String, dynamic>;
-            var aDate = aData['timestamp'] as Timestamp?;
-            var bDate = bData['timestamp'] as Timestamp?;
-            if (aDate == null) return 1;
-            if (bDate == null) return -1;
-            return bDate.compareTo(aDate);
-          });
-
-          return allBookings;
-        });
+      return filteredBookings;
+    });
   }
 
   Future<String> _getStationName(String stationId) async {
@@ -141,64 +100,103 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Manage Station Bookings'),
-        backgroundColor: Color(0xFF0033AA),
+        title: const Text('Manage Bookings'),
+        backgroundColor: const Color(0xFF0033AA),
         foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
-          // Station Selection and Status Filter
-          Padding(
-            padding: EdgeInsets.all(16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Station Selection Dropdown
                 DropdownButtonFormField<String>(
                   value: _selectedStationId,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Select Station',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.ev_station),
                   ),
-                  items: [
-                    DropdownMenuItem(
-                      value: null,
-                      child: Text('All Stations'),
-                    ),
-                    ...List.generate(
-                      _stationIds.length,
-                      (index) => DropdownMenuItem(
-                        value: _stationIds[index],
-                        child: Text(_stationNames[index]),
-                      ),
-                    ),
-                  ],
+                  items: _stationIds.asMap().entries.map((entry) {
+                    return DropdownMenuItem(
+                      value: entry.value,
+                      child: Text(_stationNames[entry.key]),
+                    );
+                  }).toList(),
                   onChanged: (value) {
                     setState(() {
                       _selectedStationId = value;
                     });
                   },
                 ),
-                SizedBox(height: 16),
-                // Status Filter
-                Row(
+                const SizedBox(height: 16),
+                // Status Filter Chips
+                Wrap(
+                  spacing: 8,
                   children: [
-                    Text('Filter by Status: ', 
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                    SizedBox(width: 10),
-                    DropdownButton<String>(
-                      value: _selectedStatus,
-                      items: [
-                        DropdownMenuItem(value: 'all', child: Text('All')),
-                        DropdownMenuItem(value: 'confirmed', child: Text('Confirmed')),
-                        DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                        DropdownMenuItem(value: 'cancelled', child: Text('Cancelled')),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedStatus = value!;
-                        });
+                    FilterChip(
+                      label: const Text('All'),
+                      selected: _selectedStatus == 'all',
+                      onSelected: (selected) {
+                        setState(() => _selectedStatus = 'all');
                       },
+                      backgroundColor: Colors.grey[200],
+                      selectedColor: const Color(0xFF0033AA).withOpacity(0.2),
+                      labelStyle: TextStyle(
+                        color: _selectedStatus == 'all' 
+                            ? const Color(0xFF0033AA) 
+                            : Colors.black87,
+                        fontWeight: _selectedStatus == 'all' 
+                            ? FontWeight.bold 
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    FilterChip(
+                      label: const Text('Booked'),
+                      selected: _selectedStatus == 'booked',
+                      onSelected: (selected) {
+                        setState(() => _selectedStatus = 'booked');
+                      },
+                      backgroundColor: Colors.grey[200],
+                      selectedColor: Colors.green.withOpacity(0.2),
+                      labelStyle: TextStyle(
+                        color: _selectedStatus == 'booked' 
+                            ? Colors.green[800] 
+                            : Colors.black87,
+                        fontWeight: _selectedStatus == 'booked' 
+                            ? FontWeight.bold 
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    FilterChip(
+                      label: const Text('Cancelled'),
+                      selected: _selectedStatus == 'cancelled',
+                      onSelected: (selected) {
+                        setState(() => _selectedStatus = 'cancelled');
+                      },
+                      backgroundColor: Colors.grey[200],
+                      selectedColor: Colors.red.withOpacity(0.2),
+                      labelStyle: TextStyle(
+                        color: _selectedStatus == 'cancelled' 
+                            ? Colors.red 
+                            : Colors.black87,
+                        fontWeight: _selectedStatus == 'cancelled' 
+                            ? FontWeight.bold 
+                            : FontWeight.normal,
+                      ),
                     ),
                   ],
                 ),
@@ -216,17 +214,17 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red, size: 48),
-                        SizedBox(height: 16),
+                        const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                        const SizedBox(height: 16),
                         Text('Error: ${snapshot.error}'),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: () => setState(() {}),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF0033AA),
+                            backgroundColor: const Color(0xFF0033AA),
                             foregroundColor: Colors.white,
                           ),
-                          child: Text('Retry'),
+                          child: const Text('Retry'),
                         ),
                       ],
                     ),
@@ -234,58 +232,56 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+                      children: const [
                         Icon(Icons.event_busy, color: Colors.grey, size: 48),
                         SizedBox(height: 16),
                         Text('No bookings found'),
-                        if (_selectedStatus != 'all')
-                          Text('Try changing the status filter'),
                       ],
                     ),
                   );
                 }
 
                 return ListView.builder(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   itemCount: snapshot.data!.length,
                   itemBuilder: (context, index) {
                     var doc = snapshot.data![index];
                     var data = doc.data() as Map<String, dynamic>;
                     
                     return Card(
-                      margin: EdgeInsets.only(bottom: 16),
+                      margin: const EdgeInsets.only(bottom: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: ExpansionTile(
                         title: Text(
                           'Booking #${doc.id.substring(0, 8)}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0033AA),
                           ),
                         ),
                         subtitle: Text(
-                          'Status: ${data['status'] ?? 'Unknown'}',
+                          'Status: ${data['status']?.toString() ?? 'Unknown'}',
                           style: TextStyle(
-                            color: _getStatusColor(data['status']),
+                            color: _getStatusColor(data['status']?.toString()),
                           ),
                         ),
                         children: [
                           Padding(
-                            padding: EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(16),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 FutureBuilder<String>(
-                                  future: _getStationName(data['stationId']),
+                                  future: _getStationName(data['station_id']?.toString() ?? ''),
                                   builder: (context, stationSnapshot) {
                                     return _buildInfoRow(
                                       'Station',
@@ -294,7 +290,7 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
                                   },
                                 ),
                                 FutureBuilder<String>(
-                                  future: _getUserName(data['userId']),
+                                  future: _getUserName(data['user_id']?.toString() ?? ''),
                                   builder: (context, userSnapshot) {
                                     return _buildInfoRow(
                                       'User Name',
@@ -302,26 +298,39 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
                                     );
                                   },
                                 ),
-                                _buildInfoRow('Date', data['date'] ?? 'N/A'),
-                                _buildInfoRow('Slot Time', data['slotTime'] ?? 'N/A'),
-                                _buildInfoRow('Amount', '₹${data['amount']?.toString() ?? '0.00'}'),
-                                _buildInfoRow('Vehicle Model', data['vehicleModel'] ?? 'N/A'),
-                                _buildInfoRow('Vehicle Number', data['vehicleNumber'] ?? 'N/A'),
-                                _buildInfoRow('Charging Capacity', '${data['chargingCapacity'] ?? 'N/A'} kW'),
-                                _buildInfoRow('Payment Status', data['paymentStatus'] ?? 'N/A'),
-                                _buildInfoRow('Payment ID', data['paymentId'] ?? 'N/A'),
-                                _buildInfoRow('Booking Time', _formatDate(data['timestamp'])),
-                                _buildInfoRow('Payment Time', _formatDate(data['paymentTimestamp'])),
-                                if (data['status'] == 'confirmed')
-                                  Padding(
-                                    padding: EdgeInsets.only(top: 16),
+                                _buildInfoRow('Date', data['date']?.toString() ?? 'N/A'),
+                                _buildInfoRow('Time', data['time']?.toString() ?? 'N/A'),
+                                _buildInfoRow('Vehicle Number', data['vehicle_number']?.toString() ?? 'N/A'),
+                                _buildInfoRow('Vehicle Model', data['vehicle_model']?.toString() ?? 'N/A'),
+                                _buildInfoRow('Charging Point', data['point_id']?.toString() ?? 'N/A'),
+                                _buildInfoRow('Charging Capacity', '${data['charging_capacity']?.toString() ?? 'N/A'} kWh'),
+                                const Divider(height: 24),
+                                _buildInfoRow(
+                                  'Total Amount', 
+                                  '₹${(data['total_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                  isAmount: true
+                                ),
+                                _buildInfoRow(
+                                  'Advance Paid', 
+                                  '₹${(data['advance_paid'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                  isAmount: true
+                                ),
+                                _buildInfoRow(
+                                  'Remaining Amount', 
+                                  '₹${(data['remaining_amount'] as num?)?.toStringAsFixed(2) ?? '0.00'}',
+                                  isAmount: true
+                                ),
+                                const SizedBox(height: 16),
+                                if (data['status']?.toString().toLowerCase() == 'booked')
+                                  SizedBox(
+                                    width: double.infinity,
                                     child: ElevatedButton(
-                                      onPressed: () => _showCancelConfirmation(context, doc.id),
+                                      onPressed: () => _showConfirmationDialog(context, doc.id, 'cancel'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.red,
                                         foregroundColor: Colors.white,
                                       ),
-                                      child: Text('Cancel Booking'),
+                                      child: const Text('Cancel Booking'),
                                     ),
                                   ),
                               ],
@@ -340,7 +349,7 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, {bool isAmount = false}) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -360,7 +369,7 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
             child: Text(
               value,
               style: TextStyle(
-                color: Colors.black87,
+                color: isAmount ? Colors.black87 : Colors.black87,
               ),
             ),
           ),
@@ -371,10 +380,8 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
 
   Color _getStatusColor(String? status) {
     switch (status?.toLowerCase()) {
-      case 'confirmed':
+      case 'booked':
         return Colors.green;
-      case 'completed':
-        return Colors.blue;
       case 'cancelled':
         return Colors.red;
       default:
@@ -390,30 +397,142 @@ class _ManageOwnerBookingsScreenState extends State<ManageOwnerBookingsScreen> {
     return 'N/A';
   }
 
-  Future<void> _showCancelConfirmation(BuildContext context, String bookingId) async {
+  Future<void> _showConfirmationDialog(BuildContext context, String bookingId, String action) async {
+    String title = action == 'confirm' ? 'Confirm Booking' : 'Cancel Booking';
+    String message = action == 'confirm' 
+        ? 'Are you sure you want to confirm this booking?'
+        : 'Are you sure you want to cancel this booking?';
+    Color buttonColor = action == 'confirm' ? Colors.green : Colors.red;
+
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Cancel Booking'),
-        content: Text('Are you sure you want to cancel this booking?'),
+        title: Text(title),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('No'),
+            child: const Text('No'),
           ),
           ElevatedButton(
             onPressed: () {
-              _cancelBooking(bookingId);
               Navigator.pop(context);
+              if (action == 'confirm') {
+                _confirmBooking(bookingId);
+              } else {
+                _cancelBooking(bookingId);
+              }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: buttonColor,
               foregroundColor: Colors.white,
             ),
-            child: Text('Yes, Cancel'),
+            child: Text('Yes, ${action == 'confirm' ? 'Confirm' : 'Cancel'}'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmBooking(String bookingId) async {
+    try {
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'status': 'confirmed',
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Booking confirmed successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error confirming booking: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _cancelBooking(String bookingId) async {
+    try {
+      // Get booking details
+      DocumentSnapshot bookingDoc = await _firestore
+          .collection('bookings')
+          .doc(bookingId)
+          .get();
+
+      if (!bookingDoc.exists) {
+        throw Exception('Booking not found');
+      }
+
+      Map<String, dynamic> booking = bookingDoc.data() as Map<String, dynamic>;
+
+      // Get slot document
+      DocumentSnapshot slotDoc = await _firestore
+          .collection('charging_slots')
+          .doc(booking['station_id'])
+          .collection('slots')
+          .doc(booking['slot_id'])
+          .get();
+
+      if (!slotDoc.exists) {
+        throw Exception('Slot not found');
+      }
+
+      Map<String, dynamic> slotData = slotDoc.data() as Map<String, dynamic>;
+      List<dynamic> chargingPoints = List.from(slotData['charging_points'] ?? []);
+
+      // Find and update the charging point status
+      bool pointFound = false;
+      for (int i = 0; i < chargingPoints.length; i++) {
+        if (chargingPoints[i]['id'].toString() == booking['point_id']) {
+          chargingPoints[i]['status'] = 'available';
+          chargingPoints[i]['booked_by'] = null;
+          chargingPoints[i]['pending_by'] = null;
+          chargingPoints[i]['updated_at'] = DateTime.now().toIso8601String();
+          pointFound = true;
+          break;
+        }
+      }
+
+      if (!pointFound) {
+        throw Exception('Charging point not found');
+      }
+
+      // Update the slot with the modified charging points
+      await _firestore
+          .collection('charging_slots')
+          .doc(booking['station_id'])
+          .collection('slots')
+          .doc(booking['slot_id'])
+          .update({
+        'charging_points': chargingPoints,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      // Update booking status
+      await _firestore.collection('bookings').doc(bookingId).update({
+        'status': 'cancelled',
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Booking cancelled successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error cancelling booking: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 } 

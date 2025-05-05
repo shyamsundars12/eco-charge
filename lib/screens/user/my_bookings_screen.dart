@@ -16,6 +16,32 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = false;
+  Map<String, String> _stationNames = {}; // Cache for station names
+
+  Future<String> _getStationName(String stationId) async {
+    // Return cached name if available
+    if (_stationNames.containsKey(stationId)) {
+      return _stationNames[stationId]!;
+    }
+
+    try {
+      DocumentSnapshot stationDoc = await _firestore
+          .collection('ev_stations')
+          .doc(stationId)
+          .get();
+
+      if (stationDoc.exists) {
+        String stationName = stationDoc['name'] ?? 'Unknown Station';
+        // Cache the station name
+        _stationNames[stationId] = stationName;
+        return stationName;
+      }
+      return 'Unknown Station';
+    } catch (e) {
+      print('Error fetching station name: $e');
+      return 'Unknown Station';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +62,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         stream: _firestore
             .collection('bookings')
             .where('user_id', isEqualTo: _auth.currentUser?.uid)
+            .where('status', isEqualTo: 'booked')
             .orderBy('created_at', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -79,81 +106,89 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
             itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
               var booking = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-              return Card(
-                margin: const EdgeInsets.only(bottom: 16),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              return FutureBuilder<String>(
+                future: _getStationName(booking['station_id']),
+                builder: (context, stationNameSnapshot) {
+                  String stationName = stationNameSnapshot.data ?? 'Loading...';
+                  
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Booking #${snapshot.data!.docs[index].id.substring(0, 8)}',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Booking #${snapshot.data!.docs[index].id.substring(0, 8)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(booking['status']).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  booking['status'].toString().toUpperCase(),
+                                  style: TextStyle(
+                                    color: _getStatusColor(booking['status']),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(booking['status']).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              booking['status'].toString().toUpperCase(),
-                              style: TextStyle(
-                                color: _getStatusColor(booking['status']),
-                                fontWeight: FontWeight.bold,
+                          const SizedBox(height: 16),
+                          _buildInfoRow('Station', stationName),
+                          _buildInfoRow('Date', booking['date']?.toString() ?? 'Not specified'),
+                          _buildInfoRow('Time', booking['time']?.toString() ?? 'Not specified'),
+                          _buildInfoRow('Charging Point', booking['point_id']?.toString() ?? 'Not specified'),
+                          _buildInfoRow('Vehicle Number', booking['vehicle_number']?.toString() ?? 'Not specified'),
+                          _buildInfoRow('Vehicle Model', booking['vehicle_model']?.toString() ?? 'Not specified'),
+                          _buildInfoRow('Charging Capacity', '${booking['charging_capacity']?.toString() ?? '0'} kWh'),
+                          const Divider(height: 32),
+                          _buildInfoRow(
+                            'Total Amount',
+                            '₹${(booking['total_amount'] ?? 0.0).toStringAsFixed(2)}',
+                            isAmount: true,
+                          ),
+                          _buildInfoRow(
+                            'Advance Paid',
+                            '₹${(booking['advance_paid'] ?? 0.0).toStringAsFixed(2)}',
+                            isAmount: true,
+                          ),
+                          _buildInfoRow(
+                            'Remaining Amount',
+                            '₹${(booking['remaining_amount'] ?? 0.0).toStringAsFixed(2)}',
+                            isAmount: true,
+                          ),
+                          const SizedBox(height: 16),
+                          if (booking['status'] == 'booked')
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () => _showCancelConfirmation(snapshot.data!.docs[index].id),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Cancel Booking'),
                               ),
                             ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      _buildInfoRow('Date', booking['date']),
-                      _buildInfoRow('Time', booking['time']),
-                      _buildInfoRow('Charging Point', booking['point_id']),
-                      _buildInfoRow('Vehicle Number', booking['vehicle_number']),
-                      _buildInfoRow('Vehicle Model', booking['vehicle_model']),
-                      _buildInfoRow('Charging Capacity', '${booking['charging_capacity']} kWh'),
-                      const Divider(height: 32),
-                      _buildInfoRow(
-                        'Total Amount',
-                        '₹${(booking['total_amount'] ?? 0.0).toStringAsFixed(2)}',
-                        isAmount: true,
-                      ),
-                      _buildInfoRow(
-                        'Advance Paid',
-                        '₹${(booking['advance_paid'] ?? 0.0).toStringAsFixed(2)}',
-                        isAmount: true,
-                      ),
-                      _buildInfoRow(
-                        'Remaining Amount',
-                        '₹${(booking['remaining_amount'] ?? 0.0).toStringAsFixed(2)}',
-                        isAmount: true,
-                      ),
-                      const SizedBox(height: 16),
-                      if (booking['status'] == 'booked')
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () => _showCancelConfirmation(snapshot.data!.docs[index].id),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Cancel Booking'),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               );
             },
           );

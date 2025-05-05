@@ -93,31 +93,74 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ..from = Address('ecochargefinder@gmail.com', 'EcoCharge')
         ..recipients.add(user.email!) // Use user's email from Firebase Auth
         ..subject = 'Booking Confirmation - EcoCharge'
-        ..text = '''
-Dear Valued Customer,
-
-Your booking has been confirmed successfully!
-
-Booking Details:
-Station: $_stationName
-Vehicle Number: ${widget.vehicleNumber}
-Vehicle Model: ${widget.vehicleModel}
-Charging Capacity: ${widget.chargingCapacity}
-Date: ${widget.date}
-Time: ${widget.slotTime}
-Amount: ₹${widget.amount.toStringAsFixed(2)}
-
-Thank you for choosing EcoCharge. We look forward to serving you!
-
-Best regards,
-EcoCharge Team
+        ..html = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #0033AA; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .details { background-color: white; padding: 20px; margin: 20px 0; border-radius: 5px; }
+        .footer { text-align: center; padding: 20px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Booking Confirmation</h2>
+        </div>
+        <div class="content">
+            <p>Dear Valued Customer,</p>
+            <p>Your booking has been confirmed successfully!</p>
+            
+            <div class="details">
+                <h3>Booking Details:</h3>
+                <p><strong>Station:</strong> $_stationName</p>
+                <p><strong>Vehicle Number:</strong> ${widget.vehicleNumber}</p>
+                <p><strong>Vehicle Model:</strong> ${widget.vehicleModel}</p>
+                <p><strong>Charging Capacity:</strong> ${widget.chargingCapacity} kWh</p>
+                <p><strong>Date:</strong> ${widget.date}</p>
+                <p><strong>Time:</strong> ${widget.slotTime}</p>
+                <p><strong>Total Amount:</strong> ₹${widget.amount.toStringAsFixed(2)}</p>
+                <p><strong>Advance Paid:</strong> ₹${(widget.amount * 0.5).toStringAsFixed(2)}</p>
+                <p><strong>Remaining Amount:</strong> ₹${(widget.amount * 0.5).toStringAsFixed(2)}</p>
+            </div>
+            
+            <p>Thank you for choosing EcoCharge. We look forward to serving you!</p>
+        </div>
+        <div class="footer">
+            <p>Best regards,<br>EcoCharge Team</p>
+        </div>
+    </div>
+</body>
+</html>
 ''';
 
       // Send the email
       final sendReport = await send(message, smtpServer);
-      print('Booking confirmation email sent: ${sendReport.toString()}');
+      print('Booking confirmation email sent successfully');
+      
+      // Show success message to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking confirmation email sent successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
       print('Error sending booking confirmation email: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending confirmation email: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -234,9 +277,12 @@ EcoCharge Team
         });
       }
 
+      // Send booking confirmation email
+      await _sendBookingConfirmationEmail();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Payment successful! Booking confirmed.'),
             backgroundColor: Colors.green,
           ),
@@ -251,10 +297,11 @@ EcoCharge Team
         );
       }
     } catch (e) {
+      print('Error in payment success handler: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error confirming booking: $e'),
+            content: Text('Error processing payment: $e'),
             backgroundColor: Colors.red,
           ),
         );

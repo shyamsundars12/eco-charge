@@ -17,7 +17,7 @@ class _ContactScreenState extends State<ContactScreen> {
   final _queryController = TextEditingController();
   bool _isLoading = false;
   String? _userEmail;
-
+                        
   @override
   void initState() {
     super.initState();
