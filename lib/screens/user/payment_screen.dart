@@ -6,6 +6,7 @@ import 'my_bookings_screen.dart';
 import '../../services/notification_service.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
+import 'dart:async';
 
 class PaymentScreen extends StatefulWidget {
   final String stationId;
@@ -44,13 +45,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
   bool _isLoading = false;
   String? _stationName;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _isPaymentProcessing = false;
 
   @override
   void initState() {
     super.initState();
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (PaymentSuccessResponse response) {
-      _handlePaymentSuccess(response);
+      if (!_isPaymentProcessing) {
+        _handlePaymentSuccess(response);
+      }
     });
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (PaymentFailureResponse response) {
       _handlePaymentError(response);
@@ -165,12 +169,27 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    if (_isPaymentProcessing) return;
+    
     try {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _isPaymentProcessing = true;
+      });
 
       // Get current user
       final user = _auth.currentUser;
       if (user == null) throw Exception('User not logged in');
+
+      // Check if booking already exists for this payment
+      QuerySnapshot existingBookings = await _firestore
+          .collection('bookings')
+          .where('payment_id', isEqualTo: response.paymentId)
+          .get();
+
+      if (existingBookings.docs.isNotEmpty) {
+        throw Exception('Booking already exists for this payment');
+      }
 
       // Create booking document
       DocumentReference bookingRef = await _firestore.collection('bookings').add({
@@ -192,7 +211,37 @@ class _PaymentScreenState extends State<PaymentScreen> {
         'payment_timestamp': FieldValue.serverTimestamp(),
         'created_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
+        'reminder_sent': false,
+        'geofence_triggered': false,
       });
+
+      // Get station details for notifications
+      DocumentSnapshot stationDoc = await _firestore
+          .collection('ev_stations')
+          .doc(widget.stationId)
+          .get();
+
+      if (!stationDoc.exists) {
+        throw Exception('Station not found');
+      }
+
+      String stationName = stationDoc.get('name') ?? 'Unknown Station';
+      double stationLat = stationDoc.get('latitude') ?? 0.0;
+      double stationLng = stationDoc.get('longitude') ?? 0.0;
+
+      // Schedule reminder notification
+      DateTime bookingDateTime = DateTime.parse('${widget.date} ${widget.slotTime}');
+      await _notificationService.scheduleReminderNotification(
+        bookingRef.id,
+        stationName,
+        bookingDateTime,
+      );
+
+      // Show booking confirmation notification
+      await _notificationService.showBookingNotification(stationName, bookingRef.id);
+
+      // Start geofence monitoring
+      _startGeofenceMonitoring(bookingRef.id, stationName, stationLat, stationLng);
 
       // Get the slot document
       DocumentSnapshot slotDoc = await _firestore
@@ -308,7 +357,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isPaymentProcessing = false;
+        });
       }
     }
   }
@@ -467,7 +519,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   void _startPayment() {
-    if (_isLoading) return; // Prevent multiple touches
+    if (_isLoading || _isPaymentProcessing) return;
 
     setState(() => _isLoading = true);
     
@@ -491,6 +543,43 @@ class _PaymentScreenState extends State<PaymentScreen> {
         SnackBar(content: Text('Error: $e')),
       );
     }
+  }
+
+  void _startGeofenceMonitoring(String bookingId, String stationName, double stationLat, double stationLng) {
+    // Check geofence every minute
+    Timer.periodic(const Duration(minutes: 1), (timer) async {
+      try {
+        bool isWithinGeofence = await _notificationService.isWithinGeofence(
+          stationLat,
+          stationLng,
+          20.0, // 20 meters radius
+        );
+
+        if (isWithinGeofence) {
+          // Get booking document
+          DocumentSnapshot bookingDoc = await _firestore
+              .collection('bookings')
+              .doc(bookingId)
+              .get();
+
+          if (bookingDoc.exists && !bookingDoc.get('geofence_triggered')) {
+            // Show geofence notification
+            await _notificationService.showGeofencingNotification(stationName, bookingId);
+
+            // Update booking document
+            await _firestore.collection('bookings').doc(bookingId).update({
+              'geofence_triggered': true,
+              'updated_at': FieldValue.serverTimestamp(),
+            });
+
+            // Stop the timer
+            timer.cancel();
+          }
+        }
+      } catch (e) {
+        print('Error in geofence monitoring: $e');
+      }
+    });
   }
 
   @override

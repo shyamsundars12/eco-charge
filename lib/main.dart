@@ -20,14 +20,10 @@ import 'screens/admin/owner_wise_reports_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    await NotificationService().initNotifications();
-  } catch (e) {
-    debugPrint("Firebase Initialization Error: $e");
-  }
-
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await NotificationService().initNotifications();
   runApp(
     MultiProvider(
       providers: [
@@ -76,8 +72,6 @@ class _ArrivalScreenState extends State<ArrivalScreen> {
   @override
   void initState() {
     super.initState();
-    NotificationService().showRandomNotification();
-
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
         Navigator.pushReplacement(

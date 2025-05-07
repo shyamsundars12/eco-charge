@@ -16,10 +16,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = false;
-  Map<String, String> _stationNames = {}; // Cache for station names
+  Map<String, String> _stationNames = {};
 
   Future<String> _getStationName(String stationId) async {
-    // Return cached name if available
     if (_stationNames.containsKey(stationId)) {
       return _stationNames[stationId]!;
     }
@@ -32,7 +31,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
       if (stationDoc.exists) {
         String stationName = stationDoc['name'] ?? 'Unknown Station';
-        // Cache the station name
         _stationNames[stationId] = stationName;
         return stationName;
       }
@@ -62,7 +60,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
         stream: _firestore
             .collection('bookings')
             .where('user_id', isEqualTo: _auth.currentUser?.uid)
-            .where('status', isEqualTo: 'booked')
+            .where('status', isEqualTo: 'booked') // Show only confirmed bookings
             .orderBy('created_at', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -90,7 +88,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No bookings found',
+                    'No confirmed bookings found',
                     style: TextStyle(
                       fontSize: 18,
                       color: Colors.grey[600],
@@ -172,18 +170,18 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
                             isAmount: true,
                           ),
                           const SizedBox(height: 16),
-                          if (booking['status'] == 'booked')
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: () => _showCancelConfirmation(snapshot.data!.docs[index].id),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red,
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Cancel Booking'),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => _showCancelConfirmation(snapshot.data!.docs[index].id),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
+                              child: const Text('Cancel Booking'),
                             ),
+                          ),
                         ],
                       ),
                     ),
@@ -260,7 +258,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
   Future<void> _cancelBooking(String bookingId) async {
     try {
       setState(() => _isLoading = true);
-      print('Starting cancellation process for booking: $bookingId');
 
       // Get booking details
       DocumentSnapshot bookingDoc = await _firestore
@@ -273,7 +270,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       }
 
       Map<String, dynamic> booking = bookingDoc.data() as Map<String, dynamic>;
-      print('Found booking details: ${booking.toString()}');
+
+      // Verify that the booking belongs to the current user
+      if (booking['user_id'] != _auth.currentUser?.uid) {
+        throw Exception('You can only cancel your own bookings');
+      }
 
       // Get slot document
       DocumentSnapshot slotDoc = await _firestore
@@ -289,14 +290,11 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
 
       Map<String, dynamic> slotData = slotDoc.data() as Map<String, dynamic>;
       List<dynamic> chargingPoints = List.from(slotData['charging_points'] ?? []);
-      print('Found slot with ${chargingPoints.length} charging points');
 
       // Find and update the charging point status
       bool pointFound = false;
       for (int i = 0; i < chargingPoints.length; i++) {
-        print('Checking point ${chargingPoints[i]['id']} against ${booking['point_id']}');
         if (chargingPoints[i]['id'].toString() == booking['point_id']) {
-          print('Found matching point, updating status');
           chargingPoints[i]['status'] = 'available';
           chargingPoints[i]['booked_by'] = null;
           chargingPoints[i]['pending_by'] = null;
@@ -311,7 +309,6 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       }
 
       // Update the slot with the modified charging points
-      print('Updating slot with modified charging points');
       await _firestore
           .collection('charging_slots')
           .doc(booking['station_id'])
@@ -323,9 +320,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
       });
 
       // Update booking status
-      print('Updating booking status to cancelled');
       await _firestore.collection('bookings').doc(bookingId).update({
         'status': 'cancelled',
+        'cancelled_at': FieldValue.serverTimestamp(),
         'updated_at': FieldValue.serverTimestamp(),
       });
 
