@@ -279,17 +279,17 @@ class _MapScreenState extends State<MapScreen> {
         context,
         MaterialPageRoute(builder: (context) => MyBookingsScreen()),
       );
-    } else if (index == 2) { // Contact tab
+    } else if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => ContactScreen()),
       );
-    } else if (index == 3) { // Chatbot tab
+    } else if (index == 3) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => ChatbotScreen()),
       );
-    } else if (index == 4) { // Profile tab
+    } else if (index == 4) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => ProfileScreen()),

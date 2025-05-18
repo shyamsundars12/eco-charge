@@ -53,7 +53,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _razorpay = Razorpay();
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (PaymentSuccessResponse response) {
       if (!_isPaymentProcessing) {
-        _handlePaymentSuccess(response);
+      _handlePaymentSuccess(response);
       }
     });
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, (PaymentFailureResponse response) {

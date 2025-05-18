@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   factory NotificationService() {
@@ -20,8 +20,8 @@ class NotificationService {
     tz.initializeTimeZones();
     
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-        
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
       requestAlertPermission: true,
@@ -111,7 +111,7 @@ class NotificationService {
 
   Future<void> showCancellationNotification(String stationName) async {
     const AndroidNotificationDetails androidNotificationDetails =
-        AndroidNotificationDetails(
+    AndroidNotificationDetails(
       'cancellation_channel',
       'Cancellation Notifications',
       importance: Importance.high,
@@ -126,7 +126,7 @@ class NotificationService {
     );
 
     const NotificationDetails notificationDetails =
-        NotificationDetails(android: androidNotificationDetails, iOS: iosNotificationDetails);
+    NotificationDetails(android: androidNotificationDetails, iOS: iosNotificationDetails);
 
     await flutterLocalNotificationsPlugin.show(
       5,
@@ -206,7 +206,7 @@ class NotificationService {
   // Function to show geofencing notification when user is near the station
   Future<void> showGeofencingNotification(String stationName, String bookingId) async {
     const AndroidNotificationDetails androidNotificationDetails =
-        AndroidNotificationDetails(
+    AndroidNotificationDetails(
       'geofence_channel',
       'Geofence Notifications',
       importance: Importance.high,
@@ -224,7 +224,7 @@ class NotificationService {
     );
 
     const NotificationDetails notificationDetails =
-        NotificationDetails(android: androidNotificationDetails, iOS: iosNotificationDetails);
+    NotificationDetails(android: androidNotificationDetails, iOS: iosNotificationDetails);
 
     await flutterLocalNotificationsPlugin.show(
       4,
